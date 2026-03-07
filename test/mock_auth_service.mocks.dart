@@ -121,6 +121,19 @@ class MockAuthService extends _i1.Mock implements _i4.AuthService {
           as _i5.Future<_i3.UserCredential>);
 
   @override
+  _i5.Future<Map<String, dynamic>> signInAndGetUserRole(
+    String? email,
+    String? password,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#signInAndGetUserRole, [email, password]),
+            returnValue: _i5.Future<Map<String, dynamic>>.value(
+              <String, dynamic>{},
+            ),
+          )
+          as _i5.Future<Map<String, dynamic>>);
+
+  @override
   _i5.Future<_i3.User?> createUserWithEmailAndPassword(
     String? email,
     String? password,
@@ -137,10 +150,11 @@ class MockAuthService extends _i1.Mock implements _i4.AuthService {
           as _i5.Future<_i3.User?>);
 
   @override
-  _i5.Future<void> updateUserProfile({String? displayName}) =>
+  _i5.Future<void> updateUserProfile({String? displayName, String? photoURL}) =>
       (super.noSuchMethod(
             Invocation.method(#updateUserProfile, [], {
               #displayName: displayName,
+              #photoURL: photoURL,
             }),
             returnValue: _i5.Future<void>.value(),
             returnValueForMissingStub: _i5.Future<void>.value(),

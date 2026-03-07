@@ -1,14 +1,14 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:path/path.dart' as p;
 
 class ContentUploadScreen extends StatefulWidget {
   const ContentUploadScreen({super.key});
@@ -27,6 +27,13 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       source: ImageSource.gallery,
     );
     if (pickedFile != null) {
+      const maxSizeInBytes = 5 * 1024 * 1024; // 5 MB
+      final imageSize = await pickedFile.length();
+      if (imageSize > maxSizeInBytes) {
+        _showErrorDialog(
+            'The selected image is too large. Please select an image under 5 MB.');
+        return;
+      }
       setState(() {
         _image = pickedFile;
       });
@@ -34,34 +41,38 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   }
 
   Future<String> _uploadImage(XFile image) async {
-    final storageRef = FirebaseStorage.instance
-        .ref()
-        .child('site_images')
-        .child('${DateTime.now().toIso8601String()}.jpg');
+    final extension = p.extension(image.path).toLowerCase();
+    final fileName = '${DateTime.now().toIso8601String()}$extension';
+    final storageRef =
+        FirebaseStorage.instance.ref().child('site_images').child(fileName);
+
+    final metadata = SettableMetadata(
+      contentType: image.mimeType ?? 'image/jpeg', // Default to JPEG
+    );
+
     if (kIsWeb) {
-      await storageRef.putData(await image.readAsBytes());
+      await storageRef.putData(await image.readAsBytes(), metadata);
     } else {
-      await storageRef.putFile(File(image.path));
+      await storageRef.putFile(File(image.path), metadata);
     }
     return await storageRef.getDownloadURL();
   }
 
   Future<void> _submit() async {
-    if (_isLoading) return; // Prevent multiple submissions
+    if (_isLoading) return;
 
     final formState = _formKey.currentState;
     if (formState == null) {
       return;
     }
 
-    // Save and validate the form
     if (!formState.saveAndValidate()) {
       _debugErrors(formState);
       return;
     }
 
     if (_image == null) {
-      _showSnackbar('Please select an image.');
+      _showErrorDialog('Please select an image to upload.');
       return;
     }
 
@@ -73,31 +84,37 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       final imageUrl = await _uploadImage(_image!);
       final formData = formState.value;
 
-      final latValue = double.tryParse(formData['latitude']) ?? 0.0;
-      final lonValue = double.tryParse(formData['longitude']) ?? 0.0;
-
-      final latitude =
-          formData['latitude_direction'] == 'S' ? -latValue : latValue;
-      final longitude =
-          formData['longitude_direction'] == 'W' ? -lonValue : lonValue;
-
       await FirebaseFirestore.instance.collection('content').add({
         'title': formData['site_title'],
         'description': formData['data_about_site'],
-        'latitude': latitude,
-        'longitude': longitude,
         'imageUrl': imageUrl,
         'createdAt': Timestamp.now(),
       });
 
-      if (!mounted) return;
-
-      _showSnackbar('Content uploaded successfully!');
-
-      context.pop();
+      if (mounted) {
+        _showSuccessDialog();
+      }
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        String errorMessage;
+        switch (e.code) {
+          case 'permission-denied':
+            errorMessage =
+                'Permission denied. Please check your Firestore security rules.';
+            break;
+          case 'unavailable':
+            errorMessage =
+                'The service is unavailable. Please check your internet connection.';
+            break;
+          default:
+            errorMessage = 'A Firebase error occurred: ${e.message}';
+        }
+        _showErrorDialog(errorMessage);
+      }
     } catch (e) {
-      if (!mounted) return;
-      _showSnackbar('An error occurred: $e');
+      if (mounted) {
+        _showErrorDialog('An unexpected error occurred: $e');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -107,9 +124,45 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     }
   }
 
-  void _showSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Success!'),
+          content: const Text('Content uploaded successfully.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Dismiss the dialog
+                context.pop(); // Go back to the previous screen
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Error'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -162,72 +215,19 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                       _buildTextField(
                         name: 'site_title',
                         hint: 'Site Title',
-                        validators: [FormBuilderValidators.required()],
+                        validators: [
+                          FormBuilderValidators.required(),
+                          FormBuilderValidators.maxLength(150),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       _buildTextField(
                         name: 'data_about_site',
                         hint: 'Data About The Site.....',
                         maxLines: 5,
-                        validators: [FormBuilderValidators.required()],
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Coordinates',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: _buildNumericField(
-                              name: 'latitude',
-                              hint: 'Latitude',
-                              min: 0,
-                              max: 90,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 1,
-                            child: _buildDropdown(
-                              name: 'latitude_direction',
-                              hint: 'N/S',
-                              items: ['N', 'S'],
-                              initialValue: 'N',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: _buildNumericField(
-                              name: 'longitude',
-                              hint: 'Longitude',
-                              min: 0,
-                              max: 180,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 1,
-                            child: _buildDropdown(
-                              name: 'longitude_direction',
-                              hint: 'E/W',
-                              items: ['E', 'W'],
-                              initialValue: 'E',
-                            ),
-                          ),
+                        validators: [
+                          FormBuilderValidators.required(),
+                          FormBuilderValidators.maxLength(2000),
                         ],
                       ),
                       const SizedBox(height: 32),
@@ -323,11 +323,20 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Upload Photos',
+                      'Upload Photo',
                       style: GoogleFonts.inter(
                         color: const Color(0xFF004D40),
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '(Max 5 MB)',
+                      style: GoogleFonts.inter(
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.normal,
+                        fontSize: 10,
                       ),
                     ),
                   ],
@@ -346,11 +355,12 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     return FormBuilderTextField(
       name: name,
       maxLines: maxLines,
+      maxLength: name == 'site_title' ? 150 : (name == 'data_about_site' ? 2000 : null),
       validator: FormBuilderValidators.compose(validators ?? []),
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: Colors.white.withOpacity(0.8),
+        fillColor: Colors.white.withAlpha(204),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
           vertical: 16,
@@ -367,84 +377,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           borderRadius: BorderRadius.circular(20.0),
           borderSide: const BorderSide(color: Color(0xFF004D40), width: 2.0),
         ),
+        counterText: '',
       ),
-    );
-  }
-
-  Widget _buildNumericField({
-    required String name,
-    required String hint,
-    required num min,
-    required num max,
-  }) {
-    return FormBuilderTextField(
-      name: name,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-      validator: FormBuilderValidators.compose([
-        FormBuilderValidators.required(),
-        FormBuilderValidators.numeric(),
-        FormBuilderValidators.min(min),
-        FormBuilderValidators.max(max),
-      ]),
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.8),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 16,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20.0),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20.0),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20.0),
-          borderSide: const BorderSide(color: Color(0xFF004D40), width: 2.0),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDropdown({
-    required String name,
-    required String hint,
-    required List<String> items,
-    String? initialValue,
-  }) {
-    return FormBuilderDropdown<String>(
-      name: name,
-      initialValue: initialValue,
-      validator: FormBuilderValidators.required(),
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.8),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 16,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20.0),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20.0),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20.0),
-          borderSide: const BorderSide(color: Color(0xFF004D40), width: 2.0),
-        ),
-      ),
-      items: items
-          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-          .toList(),
     );
   }
 }
