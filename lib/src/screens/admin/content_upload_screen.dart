@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -41,21 +42,42 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   }
 
   Future<String> _uploadImage(XFile image) async {
-    final extension = p.extension(image.path).toLowerCase();
-    final fileName = '${DateTime.now().toIso8601String()}$extension';
-    final storageRef =
-        FirebaseStorage.instance.ref().child('site_images').child(fileName);
+    final String extension = p.extension(image.path).toLowerCase();
+    final String safeExtension = extension.isNotEmpty ? extension : '.jpg';
+    final String fileName = '${DateTime.now().millisecondsSinceEpoch}$safeExtension';
+    
+    debugPrint("DEBUG: Starting upload for $fileName");
+    
+    // Explicitly getting the instance with the bucket from options just in case default isn't picking it up
+    final storage = FirebaseStorage.instance;
+    final storageRef = storage.ref().child('site_images').child(fileName);
 
     final metadata = SettableMetadata(
-      contentType: image.mimeType ?? 'image/jpeg', // Default to JPEG
+      contentType: image.mimeType ?? 'image/jpeg',
     );
 
-    if (kIsWeb) {
-      await storageRef.putData(await image.readAsBytes(), metadata);
-    } else {
-      await storageRef.putFile(File(image.path), metadata);
+    try {
+      debugPrint("DEBUG: Path - ${storageRef.fullPath}");
+      debugPrint("DEBUG: Bucket - ${storage.bucket}");
+
+      // Use putData for both Web and Mobile to avoid path issues with content providers
+      final Uint8List data = await image.readAsBytes();
+      final UploadTask uploadTask = storageRef.putData(data, metadata);
+      
+      // Monitor the task
+      final snapshot = await uploadTask;
+      debugPrint("DEBUG: Upload complete. State: ${snapshot.state}");
+      
+      final downloadUrl = await storageRef.getDownloadURL();
+      debugPrint("DEBUG: Got download URL: $downloadUrl");
+      return downloadUrl;
+    } on FirebaseException catch (e) {
+      debugPrint("DEBUG: Firebase Storage Error: ${e.code} - ${e.message}");
+      rethrow;
+    } catch (e) {
+      debugPrint("DEBUG: Unexpected Error during image upload: $e");
+      rethrow;
     }
-    return await storageRef.getDownloadURL();
   }
 
   Future<void> _submit() async {
@@ -87,7 +109,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       await FirebaseFirestore.instance.collection('content').add({
         'title': formData['site_title'],
         'description': formData['data_about_site'],
+        'latitude': double.tryParse(formData['latitude'].toString()) ?? 15.2993, // Default to Margao if invalid
+        'longitude': double.tryParse(formData['longitude'].toString()) ?? 73.9814,
         'imageUrl': imageUrl,
+        'images': [imageUrl],
         'createdAt': Timestamp.now(),
       });
 
@@ -230,6 +255,34 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                           FormBuilderValidators.maxLength(2000),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              name: 'latitude',
+                              hint: 'Latitude',
+                              validators: [
+                                FormBuilderValidators.required(),
+                                FormBuilderValidators.numeric(),
+                              ],
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              name: 'longitude',
+                              hint: 'Longitude',
+                              validators: [
+                                FormBuilderValidators.required(),
+                                FormBuilderValidators.numeric(),
+                              ],
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 32),
                       ElevatedButton(
                         onPressed: _isLoading ? null : _submit,
@@ -351,10 +404,12 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     required String hint,
     int maxLines = 1,
     List<FormFieldValidator<String>>? validators,
+    TextInputType? keyboardType,
   }) {
     return FormBuilderTextField(
       name: name,
       maxLines: maxLines,
+      keyboardType: keyboardType,
       maxLength: name == 'site_title' ? 150 : (name == 'data_about_site' ? 2000 : null),
       validator: FormBuilderValidators.compose(validators ?? []),
       decoration: InputDecoration(

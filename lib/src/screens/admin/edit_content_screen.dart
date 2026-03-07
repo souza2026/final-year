@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../../providers/location_provider.dart';
 
 class EditContentScreen extends StatefulWidget {
   const EditContentScreen({super.key});
@@ -33,13 +34,35 @@ class _EditContentScreenState extends State<EditContentScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
-                  Text(
-                    'Edit Content',
-                    style: GoogleFonts.inter(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Edit Content',
+                        style: GoogleFonts.inter(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () async {
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (c) => const Center(child: CircularProgressIndicator()),
+                          );
+                          await context.read<LocationProvider>().importJsonToDatabase();
+                          if (context.mounted) {
+                            Navigator.pop(context); // close dialog
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Successfully imported locations into the database!')));
+                          }
+                        },
+                        icon: const Icon(Icons.cloud_upload, color: Color(0xFF004D40)),
+                        tooltip: 'Import JSON to Database',
+                      )
+                    ],
                   ),
                   const SizedBox(height: 24),
                   _buildSearchBar(),
@@ -89,39 +112,15 @@ class _EditContentScreenState extends State<EditContentScreen> {
   }
 
   Widget _buildContentList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('content').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('Something went wrong'));
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    return Consumer<LocationProvider>(
+      builder: (context, locationProvider, child) {
+        if (locationProvider.isLoading && locationProvider.locations.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        var docs = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final title = data.containsKey('title')
-              ? data['title'] as String
-              : '';
-          return title.toLowerCase().contains(_searchQuery.toLowerCase());
+        var docs = locationProvider.locations.where((loc) {
+          return loc.name.toLowerCase().contains(_searchQuery.toLowerCase());
         }).toList();
-
-        // If no data exists, show dummy data to match the design request specifically
-        // This ensures the user sees the "Slide 1, Slide 2..." design immediately.
-        if (docs.isEmpty && _searchQuery.isEmpty) {
-          return ListView.builder(
-            itemCount: 4,
-            padding: EdgeInsets.zero,
-            itemBuilder: (context, index) {
-              return _buildSiteCard(
-                'Site Title ${index + 1}',
-                null,
-                'dummy_$index',
-              );
-            },
-          );
-        }
 
         if (docs.isEmpty) {
           return Center(
@@ -136,16 +135,11 @@ class _EditContentScreenState extends State<EditContentScreen> {
           itemCount: docs.length,
           padding: EdgeInsets.zero,
           itemBuilder: (context, index) {
-            final doc = docs[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final title = data.containsKey('title')
-                ? data['title'] as String
-                : 'Untitled';
-            final imageUrl = data.containsKey('imageUrl')
-                ? data['imageUrl'] as String?
-                : null;
+            final loc = docs[index];
+            final title = loc.name;
+            final imageUrl = loc.images.isNotEmpty ? loc.images.first : null;
 
-            return _buildSiteCard(title, imageUrl, doc.id);
+            return _buildSiteCard(title, imageUrl, loc.id);
           },
         );
       },
@@ -160,9 +154,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            if (!docId.startsWith('dummy_')) {
-              context.go('/admin/edit-content/$docId');
-            }
+            context.go('/admin/edit-content/$docId');
           },
           borderRadius: BorderRadius.circular(16.0),
           child: Container(
@@ -191,8 +183,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
                   ),
                   child:
                       imageUrl != null &&
-                          imageUrl.isNotEmpty &&
-                          !docId.startsWith('dummy_')
+                          imageUrl.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(12.0),
                           child: Image.network(

@@ -7,11 +7,28 @@ import 'package:provider/provider.dart';
 import 'src/services/auth_service.dart';
 import 'src/routing/app_router.dart';
 import 'src/theme/theme.dart';
+import 'src/providers/location_provider.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } else {
+      Firebase.app(); // already initialized
+    }
+  } on FirebaseException catch (e) {
+    if (e.code == 'duplicate-app') {
+      debugPrint('Firebase already initialized.');
+    } else {
+      rethrow;
+    }
+  } catch (e) {
+    debugPrint('Firebase initialization error: $e');
+  }
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
@@ -40,6 +57,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<AuthService>(create: (_) => AuthService(auth, firestore)),
+        ChangeNotifierProvider(create: (_) => LocationProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
