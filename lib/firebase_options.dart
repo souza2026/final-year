@@ -65,5 +65,4 @@ class DefaultFirebaseOptions {
     projectId: 'cultural-app-90105945-ad584',
     storageBucket: 'cultural-app-90105945-ad584.firebasestorage.app',
   );
-
 }

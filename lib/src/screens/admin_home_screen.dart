@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -69,7 +68,10 @@ class AdminHomeScreen extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 50),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 50,
+                  ),
                 ),
                 child: const Text(
                   'Back',
@@ -84,7 +86,11 @@ class AdminHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAdminOption(BuildContext context, String title, VoidCallback onTap) {
+  Widget _buildAdminOption(
+    BuildContext context,
+    String title,
+    VoidCallback onTap,
+  ) {
     return Card(
       elevation: 2,
       color: Colors.white,
@@ -96,7 +102,11 @@ class AdminHomeScreen extends StatelessWidget {
           child: Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
           ),
         ),
       ),

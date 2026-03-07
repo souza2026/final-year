@@ -10,15 +10,14 @@ This document outlines the style, design, and features of the Cultural Discovery
 *   **Routing:** A basic routing setup using `go_router`.
 *   **Firestore Integration:** User data is stored in a `users` collection in Cloud Firestore.
 *   **Basic UI:** A functional, but unstyled, set of screens for registration, login, and home.
+*   **Search Bar:** A search bar has been added to the `coming_soon_screen.dart` file.
+*   **Google Maps Integration:** A real Google Map has been integrated into the `map_screen.dart` file, replacing the previous placeholder. The map is centered on the location of Betalbatim, Goa, India.
+*   **Community Forum:** A new feature allowing users to interact with each other through posts.
+    *   **Post Model:** A `Post` model has been created in `lib/src/models/post_model.dart`.
+    *   **Community Service:** A `CommunityService` has been created in `lib/src/services/community_service.dart` to manage Firestore database operations for posts.
+    *   **Community Screen:** A `CommunityScreen` has been created in `lib/src/screens/community_screen.dart` to display posts and allow users to add new posts.
+    *   **Navigation:** The community feature is integrated into the main app navigation.
 
-## Current Plan: UI & Theme Enhancement
+## Current Plan: Awaiting User Feedback
 
-The current focus is to elevate the visual design and user experience of the application. The previous debugging session for the data entry issue will be paused, and work will now focus on the app's aesthetics.
-
-### Action Steps:
-
-1.  **Integrate Custom Fonts:** Add the `google_fonts` package to the project to improve typography.
-2.  **Establish a Centralized Theme:** Create a new theme file to define a consistent color scheme and text styles for the entire application.
-3.  **Define Typography:** Create a `TextTheme` using a selection of Google Fonts (e.g., Oswald for headings, Roboto for body text) to establish a clear visual hierarchy.
-4.  **Apply Theme to Registration Screen:** Refactor the `register_screen.dart` file to use the new, centralized theme and text styles. This will serve as the first example of the new design system.
-5.  **Improve Layout and Styling:** Enhance the visual appeal of the registration screen by applying modern design principles, including improved spacing, component styling, and a more polished layout as per the visual design guidelines.
+The Community feature has been successfully implemented. The next steps will be determined by the user's feedback and requests. The application is now ready for further enhancements or new feature development.

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
@@ -55,10 +54,7 @@ class UserManagementScreen extends StatelessWidget {
                   ),
                   subtitle: Text(
                     'Role: \$role',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   trailing: Icon(
                     role == 'admin' ? Icons.shield : Icons.person,

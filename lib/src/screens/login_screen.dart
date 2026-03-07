@@ -1,12 +1,12 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final AuthService authService;
+
+  const LoginScreen({super.key, required this.authService});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -27,8 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        await Provider.of<AuthService>(context, listen: false)
-            .signInWithEmailAndPassword(
+        await widget.authService.signInWithEmailAndPassword(
           _emailController.text,
           _passwordController.text,
         );
@@ -65,9 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login'),
-      ),
+      appBar: AppBar(title: const Text('Login')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -116,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 20),
               TextButton(
                 onPressed: () {
-                  context.go('/register');
+                  context.push('/register');
                 },
                 child: const Text("Don't have an account? Sign Up"),
               ),

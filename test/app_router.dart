@@ -3,19 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/src/screens/admin/detailed_edit_screen.dart';
 import 'package:myapp/src/screens/edit_profile_screen.dart';
-import 'package:myapp/src/screens/main_screen.dart';
 import 'package:myapp/src/screens/register_screen.dart';
-import '../services/auth_service.dart';
-import '../screens/login_screen.dart';
-import '../screens/admin_home_screen.dart';
-import '../screens/admin/content_upload_screen.dart';
-import '../screens/admin/edit_content_screen.dart';
-import '../screens/admin/user_management_screen.dart';
+import 'package:myapp/src/services/auth_service.dart';
+import 'package:myapp/src/screens/login_screen.dart';
+import 'package:myapp/src/screens/admin_home_screen.dart';
+import 'package:myapp/src/screens/admin/content_upload_screen.dart';
+import 'package:myapp/src/screens/admin/edit_content_screen.dart';
+import 'package:myapp/src/screens/admin/user_management_screen.dart';
+import 'mock_map_screen.dart';
 
-class AppRouter {
+class TestAppRouter {
   final AuthService authService;
 
-  AppRouter(this.authService);
+  TestAppRouter(this.authService);
 
   GoRouter get router => GoRouter(
         initialLocation: '/',
@@ -30,7 +30,7 @@ class AppRouter {
           ),
           GoRoute(
             path: '/map',
-            builder: (context, state) => const MainScreen(),
+            builder: (context, state) => const MockMapScreen(),
           ),
           GoRoute(
             path: '/admin',
@@ -41,15 +41,16 @@ class AppRouter {
                 builder: (context, state) => const ContentUploadScreen(),
               ),
               GoRoute(
-                  path: 'edit-content',
-                  builder: (context, state) => const EditContentScreen(),
-                  routes: [
-                    GoRoute(
-                      path: ':docId',
-                      builder: (context, state) => DetailedEditScreen(
-                          docId: state.pathParameters['docId']!),
-                    ),
-                  ]),
+                path: 'edit-content',
+                builder: (context, state) => const EditContentScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':docId',
+                    builder: (context, state) =>
+                        DetailedEditScreen(docId: state.pathParameters['docId']!),
+                  ),
+                ],
+              ),
               GoRoute(
                 path: 'user-management',
                 builder: (context, state) => const UserManagementScreen(),
@@ -68,14 +69,25 @@ class AppRouter {
           final isRegistering = state.matchedLocation == '/register';
 
           if (!isLoggedIn) {
-            return isLoggingIn || isRegistering ? null : '/';
+            if (isLoggingIn || isRegistering) {
+              return null;
+            }
+            return '/';
           }
 
           if (isLoggingIn) {
             final userDoc = await authService.getUserDocument(user.uid);
             final role =
                 (userDoc.data() as Map<String, dynamic>?)?['role'] as String?;
-            return role == 'admin' ? '/admin' : '/map';
+            if (role == 'admin') {
+              return '/admin';
+            } else {
+              return '/map';
+            }
+          }
+
+          if (isRegistering) {
+            return null;
           }
 
           return null;
@@ -88,7 +100,6 @@ class GoRouterRefreshStream extends ChangeNotifier {
   late final StreamSubscription<dynamic> _subscription;
 
   GoRouterRefreshStream(Stream<dynamic> stream) {
-    notifyListeners();
     _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
   }
 

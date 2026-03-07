@@ -1,4 +1,3 @@
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -9,16 +8,16 @@ import 'dart:developer' as developer;
 import '../theme/theme.dart';
 
 class RegisterScreen extends StatefulWidget {
-  final AuthService? authService;
   final bool showImages;
 
-  const RegisterScreen({super.key, this.authService, this.showImages = true});
+  const RegisterScreen({super.key, this.showImages = true});
 
   @override
   RegisterScreenState createState() => RegisterScreenState();
 }
 
-class RegisterScreenState extends State<RegisterScreen> with SingleTickerProviderStateMixin {
+class RegisterScreenState extends State<RegisterScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -37,21 +36,16 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeInOut,
+          ),
+        );
 
     _animationController.forward();
   }
@@ -70,13 +64,12 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
     if (_formKey.currentState!.validate()) {
       if (_passwordController.text != _confirmPasswordController.text) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Passwords do not match')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
         return;
       }
-      final authService =
-          widget.authService ?? Provider.of<AuthService>(context, listen: false);
+      final authService = Provider.of<AuthService>(context, listen: false);
       try {
         await authService.createUserWithEmailAndPassword(
           _emailController.text,
@@ -88,11 +81,6 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
         await authService.signOut();
 
         if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration successful! Please log in.')),
-        );
-
         context.go('/');
       } catch (e, s) {
         // Log the full error to the console
@@ -103,9 +91,9 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
           stackTrace: s,
         );
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create account: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to create account: $e')));
       }
     }
   }
@@ -118,7 +106,11 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
         title: const Text('Cultural Discovery'),
         actions: [
           IconButton(
-            icon: Icon(themeProvider.themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
+            icon: Icon(
+              themeProvider.themeMode == ThemeMode.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
             onPressed: () => themeProvider.toggleTheme(),
             tooltip: 'Toggle Theme',
           ),
@@ -149,10 +141,14 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
                     child: Container(
                       padding: const EdgeInsets.all(24.0),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface.withAlpha(26),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withAlpha(26),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Theme.of(context).colorScheme.onSurface.withAlpha(51),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(51),
                         ),
                       ),
                       child: Form(
@@ -162,12 +158,22 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
                           children: [
                             Text(
                               'Create Account',
-                              style: Theme.of(context).textTheme.displayLarge?.copyWith(color: Theme.of(context).colorScheme.onSurface),
+                              style: Theme.of(context).textTheme.displayLarge
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                  ),
                             ),
                             const SizedBox(height: 10),
                             Text(
                               'Join us to get started',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Theme.of(context).colorScheme.onSurface.withAlpha(179)),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withAlpha(179),
+                                  ),
                             ),
                             const SizedBox(height: 40),
                             _buildTextFormField(
@@ -186,8 +192,9 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
                               hintText: 'Email',
                               icon: Icons.email_outlined,
                               keyboardType: TextInputType.emailAddress,
-                              validator: (value) =>
-                                  value!.isEmpty ? 'Please enter an email' : null,
+                              validator: (value) => value!.isEmpty
+                                  ? 'Please enter an email'
+                                  : null,
                             ),
                             const SizedBox(height: 20),
                             _buildTextFormField(
@@ -243,11 +250,18 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface),
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface.withAlpha(179)),
-        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withAlpha(179)),
+        hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withAlpha(179),
+        ),
+        prefixIcon: Icon(
+          icon,
+          color: Theme.of(context).colorScheme.onSurface.withAlpha(179),
+        ),
         filled: true,
         fillColor: Theme.of(context).colorScheme.surface.withAlpha(51),
         border: OutlineInputBorder(
@@ -256,7 +270,9 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.onSurface.withAlpha(128)),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(128),
+          ),
         ),
       ),
       validator: validator,
@@ -298,7 +314,9 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
         ),
         child: Text(
           'Sign Up',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Theme.of(context).colorScheme.onPrimary)
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: Theme.of(context).colorScheme.onPrimary,
+          ),
         ),
       ),
     );
@@ -308,7 +326,9 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
     return RichText(
       text: TextSpan(
         text: "Already have an account? ",
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface.withAlpha(179)),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withAlpha(179),
+        ),
         children: [
           TextSpan(
             text: 'Log In',
@@ -317,8 +337,7 @@ class RegisterScreenState extends State<RegisterScreen> with SingleTickerProvide
               fontWeight: FontWeight.bold,
               decoration: TextDecoration.underline,
             ),
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => context.go('/'),
+            recognizer: TapGestureRecognizer()..onTap = () => context.pop(),
           ),
         ],
       ),

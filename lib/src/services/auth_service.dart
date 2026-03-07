@@ -1,4 +1,3 @@
-
 import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
@@ -31,12 +30,15 @@ class AuthService {
       return null;
     } catch (e) {
       developer.log('Error getting user role: $e');
-      return null;
+      rethrow;
     }
   }
 
   // Sign in with email and password
-  Future<auth.User?> signInWithEmailAndPassword(String email, String password) async {
+  Future<auth.User?> signInWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
     try {
       final credential = await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
@@ -45,13 +47,16 @@ class AuthService {
       return credential.user;
     } catch (e) {
       developer.log('Failed to sign in: $e');
-      return null;
+      rethrow;
     }
   }
 
   // Sign up with email and password
   Future<auth.User?> createUserWithEmailAndPassword(
-      String email, String password, String username) async {
+    String email,
+    String password,
+    String username,
+  ) async {
     try {
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: email,
@@ -60,7 +65,7 @@ class AuthService {
 
       if (credential.user != null) {
         await credential.user!.updateDisplayName(username);
-        
+
         // Determine role based on email
         String role = 'user';
         if (email == 'admin@myapp.com') {
@@ -78,7 +83,7 @@ class AuthService {
       return credential.user;
     } catch (e) {
       developer.log('Failed to sign up: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -96,6 +101,7 @@ class AuthService {
       }
     } catch (e) {
       developer.log('Failed to update user profile: $e');
+      rethrow;
     }
   }
 

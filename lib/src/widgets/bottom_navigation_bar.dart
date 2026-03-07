@@ -18,12 +18,16 @@ class BottomNavigationBarWidget extends StatelessWidget {
       onTap: onTap,
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: 'Home',
+          icon: Icon(Icons.map_outlined),
+          label: 'Maps',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: 'Profile',
+          icon: Icon(Icons.book),
+          label: 'History',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.auto_awesome_outlined),
+          label: 'A.I.',
         ),
       ],
     );

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:myapp/src/services/auth_service.dart';
@@ -33,9 +32,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final authService = Provider.of<AuthService>(context, listen: false);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Profile'),
-      ),
+      appBar: AppBar(title: const Text('Edit Profile')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -44,9 +41,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                ),
+                decoration: const InputDecoration(labelText: 'Name'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your name';
@@ -75,9 +70,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     } catch (e) {
                       developer.log('Error updating profile: $e');
                       messenger.showSnackBar(
-                        SnackBar(
-                          content: Text('Error updating profile: $e'),
-                        ),
+                        SnackBar(content: Text('Error updating profile: $e')),
                       );
                     }
                   }
