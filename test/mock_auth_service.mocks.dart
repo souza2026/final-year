@@ -32,24 +32,24 @@ class _FakeDocumentSnapshot_0<T extends Object?> extends _i1.SmartFake
     : super(parent, parentInvocation);
 }
 
-class _FakeUserMetadata_1 extends _i1.SmartFake implements _i3.UserMetadata {
-  _FakeUserMetadata_1(Object parent, Invocation parentInvocation)
-    : super(parent, parentInvocation);
-}
-
-class _FakeMultiFactor_2 extends _i1.SmartFake implements _i3.MultiFactor {
-  _FakeMultiFactor_2(Object parent, Invocation parentInvocation)
-    : super(parent, parentInvocation);
-}
-
-class _FakeIdTokenResult_3 extends _i1.SmartFake implements _i3.IdTokenResult {
-  _FakeIdTokenResult_3(Object parent, Invocation parentInvocation)
-    : super(parent, parentInvocation);
-}
-
-class _FakeUserCredential_4 extends _i1.SmartFake
+class _FakeUserCredential_1 extends _i1.SmartFake
     implements _i3.UserCredential {
-  _FakeUserCredential_4(Object parent, Invocation parentInvocation)
+  _FakeUserCredential_1(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeUserMetadata_2 extends _i1.SmartFake implements _i3.UserMetadata {
+  _FakeUserMetadata_2(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeMultiFactor_3 extends _i1.SmartFake implements _i3.MultiFactor {
+  _FakeMultiFactor_3(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeIdTokenResult_4 extends _i1.SmartFake implements _i3.IdTokenResult {
+  _FakeIdTokenResult_4(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
@@ -102,15 +102,23 @@ class MockAuthService extends _i1.Mock implements _i4.AuthService {
           as _i5.Future<String?>);
 
   @override
-  _i5.Future<_i3.User?> signInWithEmailAndPassword(
+  _i5.Future<_i3.UserCredential> signInWithEmailAndPassword(
     String? email,
     String? password,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#signInWithEmailAndPassword, [email, password]),
-            returnValue: _i5.Future<_i3.User?>.value(),
+            returnValue: _i5.Future<_i3.UserCredential>.value(
+              _FakeUserCredential_1(
+                this,
+                Invocation.method(#signInWithEmailAndPassword, [
+                  email,
+                  password,
+                ]),
+              ),
+            ),
           )
-          as _i5.Future<_i3.User?>);
+          as _i5.Future<_i3.UserCredential>);
 
   @override
   _i5.Future<_i3.User?> createUserWithEmailAndPassword(
@@ -171,7 +179,7 @@ class MockUser extends _i1.Mock implements _i3.User {
   _i3.UserMetadata get metadata =>
       (super.noSuchMethod(
             Invocation.getter(#metadata),
-            returnValue: _FakeUserMetadata_1(
+            returnValue: _FakeUserMetadata_2(
               this,
               Invocation.getter(#metadata),
             ),
@@ -198,7 +206,7 @@ class MockUser extends _i1.Mock implements _i3.User {
   _i3.MultiFactor get multiFactor =>
       (super.noSuchMethod(
             Invocation.getter(#multiFactor),
-            returnValue: _FakeMultiFactor_2(
+            returnValue: _FakeMultiFactor_3(
               this,
               Invocation.getter(#multiFactor),
             ),
@@ -229,7 +237,7 @@ class MockUser extends _i1.Mock implements _i3.User {
       (super.noSuchMethod(
             Invocation.method(#getIdTokenResult, [forceRefresh]),
             returnValue: _i5.Future<_i3.IdTokenResult>.value(
-              _FakeIdTokenResult_3(
+              _FakeIdTokenResult_4(
                 this,
                 Invocation.method(#getIdTokenResult, [forceRefresh]),
               ),
@@ -244,7 +252,7 @@ class MockUser extends _i1.Mock implements _i3.User {
       (super.noSuchMethod(
             Invocation.method(#linkWithCredential, [credential]),
             returnValue: _i5.Future<_i3.UserCredential>.value(
-              _FakeUserCredential_4(
+              _FakeUserCredential_1(
                 this,
                 Invocation.method(#linkWithCredential, [credential]),
               ),
@@ -257,7 +265,7 @@ class MockUser extends _i1.Mock implements _i3.User {
       (super.noSuchMethod(
             Invocation.method(#linkWithProvider, [provider]),
             returnValue: _i5.Future<_i3.UserCredential>.value(
-              _FakeUserCredential_4(
+              _FakeUserCredential_1(
                 this,
                 Invocation.method(#linkWithProvider, [provider]),
               ),
@@ -272,7 +280,7 @@ class MockUser extends _i1.Mock implements _i3.User {
       (super.noSuchMethod(
             Invocation.method(#reauthenticateWithProvider, [provider]),
             returnValue: _i5.Future<_i3.UserCredential>.value(
-              _FakeUserCredential_4(
+              _FakeUserCredential_1(
                 this,
                 Invocation.method(#reauthenticateWithProvider, [provider]),
               ),
@@ -287,7 +295,7 @@ class MockUser extends _i1.Mock implements _i3.User {
       (super.noSuchMethod(
             Invocation.method(#reauthenticateWithPopup, [provider]),
             returnValue: _i5.Future<_i3.UserCredential>.value(
-              _FakeUserCredential_4(
+              _FakeUserCredential_1(
                 this,
                 Invocation.method(#reauthenticateWithPopup, [provider]),
               ),
@@ -309,7 +317,7 @@ class MockUser extends _i1.Mock implements _i3.User {
       (super.noSuchMethod(
             Invocation.method(#linkWithPopup, [provider]),
             returnValue: _i5.Future<_i3.UserCredential>.value(
-              _FakeUserCredential_4(
+              _FakeUserCredential_1(
                 this,
                 Invocation.method(#linkWithPopup, [provider]),
               ),
@@ -352,7 +360,7 @@ class MockUser extends _i1.Mock implements _i3.User {
       (super.noSuchMethod(
             Invocation.method(#reauthenticateWithCredential, [credential]),
             returnValue: _i5.Future<_i3.UserCredential>.value(
-              _FakeUserCredential_4(
+              _FakeUserCredential_1(
                 this,
                 Invocation.method(#reauthenticateWithCredential, [credential]),
               ),

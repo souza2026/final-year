@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myapp/main.dart';
-import 'package:myapp/src/screens/login_screen.dart';
+import 'package:myapp/src/screens/onboarding_screen.dart';
 import 'package:myapp/src/theme/theme.dart';
 import 'package:provider/provider.dart';
 
@@ -11,18 +11,15 @@ void main() {
     await mockAuth.signOut();
   });
 
-  testWidgets('Renders LoginScreen', (WidgetTester tester) async {
+  testWidgets('Renders OnboardingScreen', (WidgetTester tester) async {
     await tester.pumpWidget(
       ChangeNotifierProvider(
         create: (context) => ThemeProvider(),
-        child: MyApp(
-          auth: mockAuth,
-          firestore: fakeFirestore,
-        ),
+        child: MyApp(auth: mockAuth, firestore: fakeFirestore),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(OnboardingScreen), findsOneWidget);
   });
 }

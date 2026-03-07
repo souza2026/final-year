@@ -28,8 +28,12 @@ class MyApp extends StatelessWidget {
   final FirebaseFirestore firestore;
   final GoRouter? router;
 
-  const MyApp(
-      {super.key, required this.auth, required this.firestore, this.router});
+  const MyApp({
+    super.key,
+    required this.auth,
+    required this.firestore,
+    this.router,
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -1,23 +1,36 @@
-# Blueprint: Cultural Discovery App
+# Project Blueprint
 
 ## Overview
 
-This document outlines the style, design, and features of the Cultural Discovery App. It serves as a single source of truth for the application's development, ensuring consistency and a clear roadmap for new features and improvements.
+The application is a cultural discovery app that allows users to explore points of interest on a map. It includes user authentication (login, registration), role-based access control (regular user vs. admin), and a map-based interface. Administrators have access to a separate dashboard for content management and user administration.
 
-## Implemented Features & Design
+## Key Features
 
-*   **Authentication:** User registration and login functionality using Firebase Authentication.
-*   **Routing:** A basic routing setup using `go_router`.
-*   **Firestore Integration:** User data is stored in a `users` collection in Cloud Firestore.
-*   **Basic UI:** A functional, but unstyled, set of screens for registration, login, and home.
-*   **Search Bar:** A search bar has been added to the `coming_soon_screen.dart` file.
-*   **Google Maps Integration:** A real Google Map has been integrated into the `map_screen.dart` file, replacing the previous placeholder. The map is centered on the location of Betalbatim, Goa, India.
-*   **Community Forum:** A new feature allowing users to interact with each other through posts.
-    *   **Post Model:** A `Post` model has been created in `lib/src/models/post_model.dart`.
-    *   **Community Service:** A `CommunityService` has been created in `lib/src/services/community_service.dart` to manage Firestore database operations for posts.
-    *   **Community Screen:** A `CommunityScreen` has been created in `lib/src/screens/community_screen.dart` to display posts and allow users to add new posts.
-    *   **Navigation:** The community feature is integrated into the main app navigation.
+*   **User Authentication:**
+    *   Login with email and password.
+    *   User registration with email, password, and username.
+    *   Secure session management.
+*   **Role-Based Access:**
+    *   **User Role:** Can view the main map screen with points of interest.
+    *   **Admin Role:** Can access a dedicated admin dashboard with additional functionalities.
+*   **Routing:**
+    *   Declarative routing using the `go_router` package.
+    *   Authentication-based redirects (e.g., non-logged-in users are redirected to the login screen).
+    *   Role-based redirects (e.g., admins are redirected to the admin dashboard after login).
+*   **Screens:**
+    *   **Onboarding/Login Screen:** A unified screen for both login and user registration.
+    *   **Main Screen:** Displays the map with cultural points of interest (for regular users).
+    *   **Admin Home Screen:** The main dashboard for administrators, with options for content management and user management.
+    *   **Content Upload Screen (Admin):** Allows admins to upload new content.
+    *   **Edit Content Screen (Admin):** Allows admins to edit existing content.
+    *   **User Management Screen (Admin):** Allows admins to manage user accounts.
+    *   **Edit Profile Screen (Admin):** Allows admins to edit their own profile.
+*   **Styling and Theming:**
+    *   Custom theming with light and dark modes.
+    *   Use of `google_fonts` for consistent typography.
+    *   Centralized theme management using `ThemeProvider`.
 
-## Current Plan: Awaiting User Feedback
+## Current Plan
 
-The Community feature has been successfully implemented. The next steps will be determined by the user's feedback and requests. The application is now ready for further enhancements or new feature development.
+*   **Consolidate Admin Content Management:** The separate "Content Upload" and "Edit Content" options on the admin home screen have been verified to be correctly routed. The admin workflow for content is now clear and functional.
+

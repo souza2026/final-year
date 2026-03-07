@@ -35,7 +35,7 @@ class AuthService {
   }
 
   // Sign in with email and password
-  Future<auth.User?> signInWithEmailAndPassword(
+  Future<auth.UserCredential> signInWithEmailAndPassword(
     String email,
     String password,
   ) async {
@@ -44,9 +44,28 @@ class AuthService {
         email: email,
         password: password,
       );
-      return credential.user;
+      return credential;
     } catch (e) {
       developer.log('Failed to sign in: $e');
+      rethrow;
+    }
+  }
+
+  // New function to sign in and get user role
+  Future<Map<String, dynamic>> signInAndGetUserRole(
+    String email,
+    String password,
+  ) async {
+    try {
+      final credential = await signInWithEmailAndPassword(email, password);
+      final user = credential.user;
+      if (user != null) {
+        final role = await getUserRole(user.uid);
+        return {'user': user, 'role': role};
+      }
+      return {'user': null, 'role': null};
+    } catch (e) {
+      developer.log('Failed to sign in and get user role: $e');
       rethrow;
     }
   }
@@ -78,6 +97,7 @@ class AuthService {
           'username': username,
           'role': role, // Use the determined role
           'createdAt': Timestamp.now(),
+          'photoURL': ''
         });
       }
       return credential.user;
@@ -88,7 +108,8 @@ class AuthService {
   }
 
   // Update user profile
-  Future<void> updateUserProfile({String? displayName}) async {
+  Future<void> updateUserProfile(
+      {String? displayName, String? photoURL}) async {
     try {
       final user = _firebaseAuth.currentUser;
       if (user != null) {
@@ -96,6 +117,12 @@ class AuthService {
           await user.updateDisplayName(displayName);
           await _firestore.collection('users').doc(user.uid).update({
             'username': displayName,
+          });
+        }
+        if (photoURL != null) {
+          await user.updatePhotoURL(photoURL);
+          await _firestore.collection('users').doc(user.uid).update({
+            'photoURL': photoURL,
           });
         }
       }

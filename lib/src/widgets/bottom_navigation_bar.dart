@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 class BottomNavigationBarWidget extends StatelessWidget {
@@ -17,14 +16,8 @@ class BottomNavigationBarWidget extends StatelessWidget {
       currentIndex: currentIndex,
       onTap: onTap,
       items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.map_outlined),
-          label: 'Maps',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.book),
-          label: 'History',
-        ),
+        BottomNavigationBarItem(icon: Icon(Icons.map_outlined), label: 'Maps'),
+        BottomNavigationBarItem(icon: Icon(Icons.book), label: 'History'),
         BottomNavigationBarItem(
           icon: Icon(Icons.auto_awesome_outlined),
           label: 'A.I.',

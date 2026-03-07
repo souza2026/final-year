@@ -13,17 +13,20 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
+  late TextEditingController _photoURLController;
 
   @override
   void initState() {
     super.initState();
     final user = Provider.of<AuthService>(context, listen: false).currentUser;
     _nameController = TextEditingController(text: user?.displayName ?? '');
+    _photoURLController = TextEditingController(text: user?.photoURL ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _photoURLController.dispose();
     super.dispose();
   }
 
@@ -50,6 +53,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 },
               ),
               const SizedBox(height: 20),
+              TextFormField(
+                controller: _photoURLController,
+                decoration: const InputDecoration(labelText: 'Photo URL'),
+              ),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
@@ -59,6 +67,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     try {
                       await authService.updateUserProfile(
                         displayName: _nameController.text,
+                        photoURL: _photoURLController.text,
                       );
                       developer.log('Profile update successful');
                       messenger.showSnackBar(

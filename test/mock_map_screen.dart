@@ -5,10 +5,6 @@ class MockMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('Mock Map Screen'),
-      ),
-    );
+    return const Scaffold(body: Center(child: Text('Mock Map Screen')));
   }
 }
