@@ -104,11 +104,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           final username = data.containsKey('username')
               ? data['username'] as String
               : '';
-          final email = data.containsKey('email') 
-              ? data['email'] as String 
+          final email = data.containsKey('email')
+              ? data['email'] as String
               : '';
           return username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                 email.toLowerCase().contains(_searchQuery.toLowerCase());
+              email.toLowerCase().contains(_searchQuery.toLowerCase());
         }).toList();
 
         if (docs.isEmpty) {
@@ -126,9 +126,15 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           itemBuilder: (context, index) {
             final doc = docs[index];
             final data = doc.data() as Map<String, dynamic>;
-            final username = data.containsKey('username') ? data['username'] as String : 'No Username';
-            final email = data.containsKey('email') ? data['email'] as String : 'No Email';
-            final role = data.containsKey('role') ? data['role'] as String : 'user';
+            final username = data.containsKey('username')
+                ? data['username'] as String
+                : 'No Username';
+            final email = data.containsKey('email')
+                ? data['email'] as String
+                : 'No Email';
+            final role = data.containsKey('role')
+                ? data['role'] as String
+                : 'user';
 
             return _buildUserCard(username, email, role, doc.id);
           },
@@ -137,7 +143,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
   }
 
-  Widget _buildUserCard(String username, String email, String role, String docId) {
+  Widget _buildUserCard(
+    String username,
+    String email,
+    String role,
+    String docId,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
       decoration: BoxDecoration(
@@ -146,7 +157,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         border: Border.all(color: const Color(0xFFEEEEEE)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(10), 
+            color: Colors.black.withAlpha(10),
             blurRadius: 10,
             offset: const Offset(0, 2),
             spreadRadius: 0,
@@ -154,7 +165,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ],
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 10,
+        ),
         title: Text(
           username,
           style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500),
@@ -178,22 +192,19 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: currentRole,
-          items: <String>['user', 'admin']
-              .map<DropdownMenuItem<String>>((String value) {
+          items: <String>['user', 'admin'].map<DropdownMenuItem<String>>((
+            String value,
+          ) {
             return DropdownMenuItem<String>(
               value: value,
-              child: Text(
-                value,
-                style: GoogleFonts.inter(fontSize: 14),
-              ),
+              child: Text(value, style: GoogleFonts.inter(fontSize: 14)),
             );
           }).toList(),
           onChanged: (String? newValue) {
             if (newValue != null && newValue != currentRole) {
-              FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(docId)
-                  .update({'role': newValue});
+              FirebaseFirestore.instance.collection('users').doc(docId).update({
+                'role': newValue,
+              });
             }
           },
         ),

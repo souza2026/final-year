@@ -50,18 +50,30 @@ class _EditContentScreenState extends State<EditContentScreen> {
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (c) => const Center(child: CircularProgressIndicator()),
+                            builder: (c) => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
                           );
-                          await context.read<LocationProvider>().importJsonToDatabase();
+                          await context
+                              .read<LocationProvider>()
+                              .importJsonToDatabase();
                           if (context.mounted) {
                             Navigator.pop(context); // close dialog
                             ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Successfully imported locations into the database!')));
+                              const SnackBar(
+                                content: Text(
+                                  'Successfully imported locations into the database!',
+                                ),
+                              ),
+                            );
                           }
                         },
-                        icon: const Icon(Icons.cloud_upload, color: Color(0xFF004D40)),
+                        icon: const Icon(
+                          Icons.cloud_upload,
+                          color: Color(0xFF004D40),
+                        ),
                         tooltip: 'Import JSON to Database',
-                      )
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -181,9 +193,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
                     borderRadius: BorderRadius.circular(12.0),
                     color: const Color(0xFF004D40),
                   ),
-                  child:
-                      imageUrl != null &&
-                          imageUrl.isNotEmpty
+                  child: imageUrl != null && imageUrl.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(12.0),
                           child: Image.network(

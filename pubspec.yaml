@@ -49,6 +49,10 @@ dependencies:
   form_builder_validators: ^11.2.0
   path: ^1.9.1
   location: ^8.0.1
+  url_launcher: ^6.3.2
+  path_provider: ^2.1.5
+  shared_preferences: ^2.5.4
+  supabase_flutter: ^2.12.0
 
 dev_dependencies:
   flutter_test:

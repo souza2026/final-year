@@ -30,7 +30,7 @@ class AuthService {
       return null;
     } catch (e) {
       developer.log('Error getting user role: $e');
-      rethrow;
+      return null;
     }
   }
 
@@ -97,7 +97,7 @@ class AuthService {
           'username': username,
           'role': role, // Use the determined role
           'createdAt': Timestamp.now(),
-          'photoURL': ''
+          'photoURL': '',
         });
       }
       return credential.user;
@@ -108,8 +108,10 @@ class AuthService {
   }
 
   // Update user profile
-  Future<void> updateUserProfile(
-      {String? displayName, String? photoURL}) async {
+  Future<void> updateUserProfile({
+    String? displayName,
+    String? photoURL,
+  }) async {
     try {
       final user = _firebaseAuth.currentUser;
       if (user != null) {

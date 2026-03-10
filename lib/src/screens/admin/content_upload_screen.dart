@@ -1,7 +1,4 @@
-import 'dart:typed_data';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
@@ -10,6 +7,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../providers/location_provider.dart';
+import '../../models/location_model.dart';
 
 class ContentUploadScreen extends StatefulWidget {
   const ContentUploadScreen({super.key});
@@ -32,7 +33,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       final imageSize = await pickedFile.length();
       if (imageSize > maxSizeInBytes) {
         _showErrorDialog(
-            'The selected image is too large. Please select an image under 5 MB.');
+          'The selected image is too large. Please select an image under 5 MB.',
+        );
         return;
       }
       setState(() {
@@ -44,38 +46,26 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   Future<String> _uploadImage(XFile image) async {
     final String extension = p.extension(image.path).toLowerCase();
     final String safeExtension = extension.isNotEmpty ? extension : '.jpg';
-    final String fileName = '${DateTime.now().millisecondsSinceEpoch}$safeExtension';
-    
-    debugPrint("DEBUG: Starting upload for $fileName");
-    
-    // Explicitly getting the instance with the bucket from options just in case default isn't picking it up
-    final storage = FirebaseStorage.instance;
-    final storageRef = storage.ref().child('site_images').child(fileName);
+    final String fileName =
+        '${DateTime.now().millisecondsSinceEpoch}$safeExtension';
+    final String path = 'uploads/$fileName';
 
-    final metadata = SettableMetadata(
-      contentType: image.mimeType ?? 'image/jpeg',
-    );
+    final bytes = await image.readAsBytes();
 
     try {
-      debugPrint("DEBUG: Path - ${storageRef.fullPath}");
-      debugPrint("DEBUG: Bucket - ${storage.bucket}");
-
-      // Use putData for both Web and Mobile to avoid path issues with content providers
-      final Uint8List data = await image.readAsBytes();
-      final UploadTask uploadTask = storageRef.putData(data, metadata);
-      
-      // Monitor the task
-      final snapshot = await uploadTask;
-      debugPrint("DEBUG: Upload complete. State: ${snapshot.state}");
-      
-      final downloadUrl = await storageRef.getDownloadURL();
-      debugPrint("DEBUG: Got download URL: $downloadUrl");
-      return downloadUrl;
-    } on FirebaseException catch (e) {
-      debugPrint("DEBUG: Firebase Storage Error: ${e.code} - ${e.message}");
-      rethrow;
+      await Supabase.instance.client.storage
+          .from('site_images')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+      final String publicUrl = Supabase.instance.client.storage
+          .from('site_images')
+          .getPublicUrl(path);
+      return publicUrl;
     } catch (e) {
-      debugPrint("DEBUG: Unexpected Error during image upload: $e");
+      debugPrint("Storage error: $e");
       rethrow;
     }
   }
@@ -106,35 +96,19 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       final imageUrl = await _uploadImage(_image!);
       final formData = formState.value;
 
-      await FirebaseFirestore.instance.collection('content').add({
-        'title': formData['site_title'],
-        'description': formData['data_about_site'],
-        'latitude': double.tryParse(formData['latitude'].toString()) ?? 15.2993, // Default to Margao if invalid
-        'longitude': double.tryParse(formData['longitude'].toString()) ?? 73.9814,
-        'imageUrl': imageUrl,
-        'images': [imageUrl],
-        'createdAt': Timestamp.now(),
-      });
+      final newLocation = LocationModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: formData['site_title'],
+        description: formData['data_about_site'],
+        latitude: double.tryParse(formData['latitude'].toString()) ?? 15.2993,
+        longitude: double.tryParse(formData['longitude'].toString()) ?? 73.9814,
+        images: [imageUrl],
+      );
 
+      // Save to Supabase (via LocationProvider)
       if (mounted) {
+        await context.read<LocationProvider>().addCustomLocation(newLocation);
         _showSuccessDialog();
-      }
-    } on FirebaseException catch (e) {
-      if (mounted) {
-        String errorMessage;
-        switch (e.code) {
-          case 'permission-denied':
-            errorMessage =
-                'Permission denied. Please check your Firestore security rules.';
-            break;
-          case 'unavailable':
-            errorMessage =
-                'The service is unavailable. Please check your internet connection.';
-            break;
-          default:
-            errorMessage = 'A Firebase error occurred: ${e.message}';
-        }
-        _showErrorDialog(errorMessage);
       }
     } catch (e) {
       if (mounted) {
@@ -266,7 +240,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                                 FormBuilderValidators.required(),
                                 FormBuilderValidators.numeric(),
                               ],
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -278,7 +255,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                                 FormBuilderValidators.required(),
                                 FormBuilderValidators.numeric(),
                               ],
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                             ),
                           ),
                         ],
@@ -299,7 +279,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
                               )
                             : Text(
                                 'Submit',
@@ -410,7 +392,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       name: name,
       maxLines: maxLines,
       keyboardType: keyboardType,
-      maxLength: name == 'site_title' ? 150 : (name == 'data_about_site' ? 2000 : null),
+      maxLength: name == 'site_title'
+          ? 150
+          : (name == 'data_about_site' ? 2000 : null),
       validator: FormBuilderValidators.compose(validators ?? []),
       decoration: InputDecoration(
         hintText: hint,

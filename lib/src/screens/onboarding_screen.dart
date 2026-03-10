@@ -18,7 +18,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -323,7 +324,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 ),
                                 onPressed: () {
                                   setState(() {
-                                    _confirmPasswordVisible = !_confirmPasswordVisible;
+                                    _confirmPasswordVisible =
+                                        !_confirmPasswordVisible;
                                   });
                                 },
                               ),

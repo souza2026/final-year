@@ -1,9 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DetailedEditScreen extends StatefulWidget {
   final String docId;
@@ -38,22 +37,27 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
 
   Future<void> _loadData() async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('content')
-          .doc(widget.docId)
-          .get();
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        _titleController.text = data['title'] ?? '';
-        _descriptionController.text = data['description'] ?? '';
-        _latitudeController.text = (data['latitude'] ?? 0.0).toString();
-        _longitudeController.text = (data['longitude'] ?? 0.0).toString();
+      final doc = await Supabase.instance.client
+          .from('content')
+          .select()
+          .eq('id', widget.docId)
+          .maybeSingle();
+
+      if (doc != null) {
+        _titleController.text = doc['title'] ?? '';
+        _descriptionController.text = doc['description'] ?? '';
+        _latitudeController.text = (doc['latitude'] ?? 0.0).toString();
+        _longitudeController.text = (doc['longitude'] ?? 0.0).toString();
         setState(() {
-          _imageUrl = data['imageUrl'];
+          _imageUrl =
+              doc['imageUrl'] ??
+              (doc['images'] != null && doc['images'].isNotEmpty
+                  ? doc['images'][0]
+                  : null);
         });
       }
     } catch (e) {
-      // Handle error
+      debugPrint("Load error: $e");
     }
   }
 
@@ -70,13 +74,20 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
 
   Future<String?> _uploadImage(File image) async {
     try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('site_images')
-          .child('${DateTime.now().toIso8601String()}.jpg');
-      await storageRef.putFile(image);
-      return await storageRef.getDownloadURL();
+      final bytes = await image.readAsBytes();
+      final path = 'site_images/${DateTime.now().toIso8601String()}.jpg';
+      await Supabase.instance.client.storage
+          .from('site_images')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+      return Supabase.instance.client.storage
+          .from('site_images')
+          .getPublicUrl(path);
     } catch (e) {
+      debugPrint("Storage error: $e");
       return null;
     }
   }
@@ -95,21 +106,23 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
 
     if (newImageUrl != null) {
       try {
-        await FirebaseFirestore.instance
-            .collection('content')
-            .doc(widget.docId)
+        await Supabase.instance.client
+            .from('content')
             .update({
               'title': _titleController.text,
               'description': _descriptionController.text,
               'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
               'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
               'imageUrl': newImageUrl,
-            });
+              'images': [newImageUrl], // keeping images array in sync
+            })
+            .eq('id', widget.docId);
+
         if (mounted) {
           context.pop();
         }
       } catch (e) {
-        // Handle error
+        debugPrint("Update error: $e");
       }
     }
 
@@ -123,15 +136,15 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
       _isDeleting = true;
     });
     try {
-      await FirebaseFirestore.instance
-          .collection('content')
-          .doc(widget.docId)
-          .delete();
+      await Supabase.instance.client
+          .from('content')
+          .delete()
+          .eq('id', widget.docId);
       if (mounted) {
         context.go('/admin/edit-content');
       }
     } catch (e) {
-      // Handle error
+      debugPrint("Delete error: $e");
     }
     setState(() {
       _isDeleting = false;
