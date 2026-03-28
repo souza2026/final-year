@@ -377,6 +377,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFFB2DFDB),
         foregroundColor: const Color(0xFF006A6A),
+        minimumSize: const Size(0, 50),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(30.0),
           side: const BorderSide(color: Color(0xFF006A6A), width: 2),
@@ -395,6 +396,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.red,
         foregroundColor: Colors.white,
+        minimumSize: const Size(0, 50),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(30.0),
         ),

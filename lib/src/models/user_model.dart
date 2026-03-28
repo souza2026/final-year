@@ -1,11 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class UserModel {
   final String uid;
   final String email;
   final String role;
   final String username;
-  final Timestamp createdAt;
+  final DateTime createdAt;
 
   UserModel({
     required this.uid,
@@ -15,15 +13,14 @@ class UserModel {
     required this.createdAt,
   });
 
-  // Factory to create a UserModel from a Firestore document
-  factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    Map data = doc.data() as Map<String, dynamic>;
+  /// Create a UserModel from a Supabase row (Map).
+  factory UserModel.fromMap(Map<String, dynamic> data) {
     return UserModel(
-      uid: doc.id,
+      uid: data['id'] ?? '',
       email: data['email'] ?? '',
       role: data['role'] ?? 'user',
       username: data['username'] ?? '',
-      createdAt: data['createdAt'] ?? Timestamp.now(),
+      createdAt: DateTime.tryParse(data['created_at'] ?? '') ?? DateTime.now(),
     );
   }
 }

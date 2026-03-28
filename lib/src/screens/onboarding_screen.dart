@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -87,20 +87,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         );
         // After registration, the user is logged in, and the router will redirect.
       }
-    } on auth.FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       String message;
-      switch (e.code) {
-        case 'user-not-found':
-          message = 'No user found for that email.';
-          break;
-        case 'wrong-password':
-          message = 'Wrong password provided for that user.';
-          break;
-        case 'email-already-in-use':
-          message = 'An account already exists for that email.';
-          break;
-        default:
-          message = 'An unknown error occurred. Please try again.';
+      final msg = e.message.toLowerCase();
+      if (msg.contains('invalid login credentials') ||
+          msg.contains('user not found')) {
+        message = 'Invalid email or password.';
+      } else if (msg.contains('already registered') ||
+          msg.contains('already been registered')) {
+        message = 'An account already exists for that email.';
+      } else {
+        message = e.message;
       }
       if (mounted) {
         setState(() {
@@ -108,9 +105,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         });
       }
     } catch (e) {
+      debugPrint('Auth error: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'An unexpected error occurred. Please try again.';
+          _errorMessage = 'Error: $e';
         });
       }
     } finally {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:myapp/src/services/auth_service.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/src/models/user_model.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -21,23 +21,58 @@ class ProfileScreen extends StatelessWidget {
       body: Center(
         child: user == null
             ? const CircularProgressIndicator()
-            : FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(user.uid)
-                    .get(),
+            : FutureBuilder<Map<String, dynamic>?>(
+                future: Supabase.instance.client
+                    .from('users')
+                    .select()
+                    .eq('id', user.id)
+                    .maybeSingle(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const CircularProgressIndicator();
                   }
                   if (snapshot.hasError) {
-                    return const Text('Error fetching user data');
+                    debugPrint('Profile error: ${snapshot.error}');
+                    return Text('Error: ${snapshot.error}');
                   }
-                  if (!snapshot.hasData || !snapshot.data!.exists) {
-                    return const Text('User data not found');
+                  if (snapshot.data == null) {
+                    return Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            child: Text(
+                              (user.email ?? 'U')[0].toUpperCase(),
+                              style: const TextStyle(fontSize: 40),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Email: ${user.email ?? 'N/A'}',
+                            style: const TextStyle(fontSize: 18),
+                          ),
+                          const SizedBox(height: 30),
+                          ElevatedButton(
+                            onPressed: () async {
+                              await authService.signOut();
+                              if (context.mounted) {
+                                context.go('/');
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                            ),
+                            child: const Text('Logout'),
+                          ),
+                        ],
+                      ),
+                    );
                   }
 
-                  final userModel = UserModel.fromFirestore(snapshot.data!);
+                  final userModel = UserModel.fromMap(snapshot.data!);
 
                   return Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -73,7 +108,7 @@ class ProfileScreen extends StatelessWidget {
                           onPressed: () async {
                             await authService.signOut();
                             if (context.mounted) {
-                              context.go('/login');
+                              context.go('/');
                             }
                           },
                           style: ElevatedButton.styleFrom(

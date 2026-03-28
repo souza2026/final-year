@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});
@@ -12,6 +12,42 @@ class UserManagementScreen extends StatefulWidget {
 
 class _UserManagementScreenState extends State<UserManagementScreen> {
   String _searchQuery = '';
+  final _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _users = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers();
+  }
+
+  Future<void> _fetchUsers() async {
+    try {
+      final data = await _supabase.from('users').select();
+      if (mounted) {
+        setState(() {
+          _users = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching users: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredUsers {
+    if (_searchQuery.isEmpty) return _users;
+    return _users.where((user) {
+      final username = (user['username'] ?? '').toString().toLowerCase();
+      final email = (user['email'] ?? '').toString().toLowerCase();
+      final query = _searchQuery.toLowerCase();
+      return username.contains(query) || email.contains(query);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,56 +125,32 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   Widget _buildUserList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('Something went wrong'));
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-        var docs = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final username = data.containsKey('username')
-              ? data['username'] as String
-              : '';
-          final email = data.containsKey('email')
-              ? data['email'] as String
-              : '';
-          return username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              email.toLowerCase().contains(_searchQuery.toLowerCase());
-        }).toList();
+    final users = _filteredUsers;
 
-        if (docs.isEmpty) {
-          return Center(
-            child: Text(
-              'No users found.',
-              style: GoogleFonts.inter(color: Colors.grey),
-            ),
-          );
-        }
+    if (users.isEmpty) {
+      return Center(
+        child: Text(
+          'No users found.',
+          style: GoogleFonts.inter(color: Colors.grey),
+        ),
+      );
+    }
 
-        return ListView.builder(
-          itemCount: docs.length,
-          padding: EdgeInsets.zero,
-          itemBuilder: (context, index) {
-            final doc = docs[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final username = data.containsKey('username')
-                ? data['username'] as String
-                : 'No Username';
-            final email = data.containsKey('email')
-                ? data['email'] as String
-                : 'No Email';
-            final role = data.containsKey('role')
-                ? data['role'] as String
-                : 'user';
+    return ListView.builder(
+      itemCount: users.length,
+      padding: EdgeInsets.zero,
+      itemBuilder: (context, index) {
+        final user = users[index];
+        final username = user['username'] ?? 'No Username';
+        final email = user['email'] ?? 'No Email';
+        final role = user['role'] ?? 'user';
+        final userId = user['id'] as String;
 
-            return _buildUserCard(username, email, role, doc.id);
-          },
-        );
+        return _buildUserCard(username, email, role, userId);
       },
     );
   }
@@ -147,7 +159,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     String username,
     String email,
     String role,
-    String docId,
+    String userId,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -177,12 +189,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           email,
           style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade600),
         ),
-        trailing: _buildRoleDropdown(role, docId),
+        trailing: _buildRoleDropdown(role, userId),
       ),
     );
   }
 
-  Widget _buildRoleDropdown(String currentRole, String docId) {
+  Widget _buildRoleDropdown(String currentRole, String userId) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
       decoration: BoxDecoration(
@@ -200,11 +212,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               child: Text(value, style: GoogleFonts.inter(fontSize: 14)),
             );
           }).toList(),
-          onChanged: (String? newValue) {
+          onChanged: (String? newValue) async {
             if (newValue != null && newValue != currentRole) {
-              FirebaseFirestore.instance.collection('users').doc(docId).update({
-                'role': newValue,
-              });
+              await _supabase
+                  .from('users')
+                  .update({'role': newValue}).eq('id', userId);
+              _fetchUsers(); // Refresh the list
             }
           },
         ),

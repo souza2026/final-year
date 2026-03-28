@@ -4,9 +4,15 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:location/location.dart' as loc;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../providers/location_provider.dart';
+import '../providers/map_state_provider.dart';
 import '../models/location_model.dart';
+import '../widgets/map/search_bar_widget.dart';
+import '../widgets/map/location_name_chip.dart';
+import '../widgets/map/radius_selector_widget.dart';
+import '../widgets/map/route_info_bar.dart'; // DirectionPanel
 import 'package:google_fonts/google_fonts.dart';
 
 class MapScreen extends StatefulWidget {
@@ -18,12 +24,67 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
-  double _currentZoom = 14.0;
-  final double _zoomThreshold = 13.0;
+  bool _hasMovedToUserLocation = false;
+  bool _mapReady = false;
+  LocationProvider? _locationProviderRef;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _locationProviderRef = Provider.of<LocationProvider>(context, listen: false);
+      _locationProviderRef!.addListener(_onLocationChanged);
+      _fetchInitialLocationName();
+    });
+  }
+
+  @override
+  void dispose() {
+    _locationProviderRef?.removeListener(_onLocationChanged);
+    super.dispose();
+  }
+
+  void _onLocationChanged() {
+    if (_hasMovedToUserLocation || !_mapReady) return;
+    final currentLoc = _locationProviderRef?.currentLocation;
+    if (currentLoc != null &&
+        currentLoc.latitude != null &&
+        currentLoc.longitude != null) {
+      _hasMovedToUserLocation = true;
+      _mapController.move(
+        LatLng(currentLoc.latitude!, currentLoc.longitude!),
+        14.0,
+      );
+      _fetchInitialLocationName();
+    }
+  }
+
+  void _fetchInitialLocationName() {
+    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    final mapState = Provider.of<MapStateProvider>(context, listen: false);
+    final currentLoc = locationProvider.currentLocation;
+    if (currentLoc != null &&
+        currentLoc.latitude != null &&
+        currentLoc.longitude != null) {
+      mapState.updateCurrentLocationName(
+        currentLoc.latitude!,
+        currentLoc.longitude!,
+      );
+      mapState.calculateNearbyCount(
+        locationProvider.locations,
+        LatLng(currentLoc.latitude!, currentLoc.longitude!),
+      );
+    }
+  }
+
+  void _fitBoundsForRoute(LatLng origin, List<LatLng> allPoints) {
+    final bounds = LatLngBounds.fromPoints([origin, ...allPoints]);
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: bounds,
+        padding: const EdgeInsets.all(80),
+      ),
+    );
   }
 
   void _showLocationDetails(
@@ -66,7 +127,6 @@ class _MapScreenState extends State<MapScreen> {
                 controller: controller,
                 padding: const EdgeInsets.all(20),
                 children: [
-                  // Handle handle
                   Center(
                     child: Container(
                       width: 40,
@@ -107,35 +167,26 @@ class _MapScreenState extends State<MapScreen> {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
                               child: location.images[index].startsWith('http')
-                                  ? Image.network(
-                                      location.images[index],
+                                  ? CachedNetworkImage(
+                                      imageUrl: location.images[index],
                                       width: 280,
                                       fit: BoxFit.cover,
-                                      loadingBuilder:
-                                          (context, child, loadingProgress) {
-                                            if (loadingProgress == null) {
-                                              return child;
-                                            }
-                                            return Container(
-                                              width: 280,
-                                              color: Colors.grey[200],
-                                              child: const Center(
-                                                child:
-                                                    CircularProgressIndicator(),
-                                              ),
-                                            );
-                                          },
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return Container(
-                                              width: 280,
-                                              color: Colors.grey[200],
-                                              child: const Icon(
-                                                Icons.error,
-                                                color: Colors.red,
-                                              ),
-                                            );
-                                          },
+                                      placeholder: (context, url) => Container(
+                                        width: 280,
+                                        color: Colors.grey[200],
+                                        child: const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) =>
+                                          Container(
+                                        width: 280,
+                                        color: Colors.grey[200],
+                                        child: const Icon(
+                                          Icons.error,
+                                          color: Colors.red,
+                                        ),
+                                      ),
                                     )
                                   : Image.file(
                                       File(location.images[index]),
@@ -143,15 +194,15 @@ class _MapScreenState extends State<MapScreen> {
                                       fit: BoxFit.cover,
                                       errorBuilder:
                                           (context, error, stackTrace) {
-                                            return Container(
-                                              width: 280,
-                                              color: Colors.grey[200],
-                                              child: const Icon(
-                                                Icons.error,
-                                                color: Colors.red,
-                                              ),
-                                            );
-                                          },
+                                        return Container(
+                                          width: 280,
+                                          color: Colors.grey[200],
+                                          child: const Icon(
+                                            Icons.error,
+                                            color: Colors.red,
+                                          ),
+                                        );
+                                      },
                                     ),
                             ),
                           );
@@ -161,7 +212,6 @@ class _MapScreenState extends State<MapScreen> {
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
                     onPressed: () async {
-                      // Using the deep link for cross-platform routing
                       final Uri url = Uri.parse(
                         'https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}',
                       );
@@ -230,18 +280,26 @@ class _MapScreenState extends State<MapScreen> {
                   currentLocation.latitude ?? 0.0,
                   currentLocation.longitude ?? 0.0,
                 )
-              : const LatLng(
-                  15.261374,
-                  74.043374,
-                ); // Fallback to provided coord
+              : const LatLng(15.261374, 74.043374);
 
-          List<Marker> markers = [];
+          // Read mapState without listening - overlay widgets have their own listeners
+          final mapState = context.read<MapStateProvider>();
 
-          if (_currentZoom >= _zoomThreshold) {
-            // Show Markers when zoomed in
-            markers = locationProvider.locations.map((loc) {
+          // Calculate nearby count silently
+          final center = mapState.routeDestination ?? initialPos;
+          mapState.calculateNearbyCountSilent(locationProvider.locations, center);
+
+          // Build markers based on radius
+          const distanceCalc = Distance();
+          final radiusMeters = mapState.selectedRadius * 1000;
+          List<Marker> markers = locationProvider.locations.map((loc) {
+            final locPoint = LatLng(loc.latitude, loc.longitude);
+            final metersFromCenter = distanceCalc(center, locPoint);
+            final isInsideRadius = metersFromCenter <= radiusMeters;
+
+            if (isInsideRadius) {
               return Marker(
-                point: LatLng(loc.latitude, loc.longitude),
+                point: locPoint,
                 width: 150,
                 height: 100,
                 child: GestureDetector(
@@ -261,8 +319,9 @@ class _MapScreenState extends State<MapScreen> {
                           image: loc.images.isNotEmpty
                               ? DecorationImage(
                                   image: loc.images.first.startsWith('http')
-                                      ? NetworkImage(loc.images.first)
-                                            as ImageProvider
+                                      ? CachedNetworkImageProvider(
+                                              loc.images.first)
+                                          as ImageProvider
                                       : FileImage(File(loc.images.first)),
                                   fit: BoxFit.cover,
                                 )
@@ -270,7 +329,8 @@ class _MapScreenState extends State<MapScreen> {
                           color: const Color(0xFF005A60),
                         ),
                         child: loc.images.isEmpty
-                            ? const Icon(Icons.location_on, color: Colors.white)
+                            ? const Icon(Icons.location_on,
+                                color: Colors.white)
                             : null,
                       ),
                       const SizedBox(height: 4),
@@ -300,12 +360,9 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               );
-            }).toList();
-          } else {
-            // Show small dots when zoomed out
-            markers = locationProvider.locations.map((loc) {
+            } else {
               return Marker(
-                point: LatLng(loc.latitude, loc.longitude),
+                point: locPoint,
                 width: 16,
                 height: 16,
                 child: GestureDetector(
@@ -313,12 +370,9 @@ class _MapScreenState extends State<MapScreen> {
                       _showLocationDetails(context, loc, currentLocation),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF005A60), // Solid Teal
+                      color: const Color(0xFF005A60),
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 2,
-                      ), // White outline for contrast
+                      border: Border.all(color: Colors.white, width: 2),
                       boxShadow: const [
                         BoxShadow(color: Colors.black26, blurRadius: 2),
                       ],
@@ -326,9 +380,10 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               );
-            }).toList();
-          }
+            }
+          }).toList();
 
+          // Current location marker
           if (currentLocation != null &&
               currentLocation.latitude != null &&
               currentLocation.longitude != null) {
@@ -358,6 +413,38 @@ class _MapScreenState extends State<MapScreen> {
             );
           }
 
+          // Waypoint markers (orange)
+          for (final waypoint in mapState.waypoints) {
+            markers.add(
+              Marker(
+                point: waypoint.latLng,
+                width: 36,
+                height: 36,
+                child: const Icon(
+                  Icons.location_on,
+                  color: Colors.orange,
+                  size: 36,
+                ),
+              ),
+            );
+          }
+
+          // Destination marker (red)
+          if (mapState.routeDestination != null) {
+            markers.add(
+              Marker(
+                point: mapState.routeDestination!,
+                width: 40,
+                height: 40,
+                child: const Icon(
+                  Icons.location_on,
+                  color: Color(0xFFE53935),
+                  size: 40,
+                ),
+              ),
+            );
+          }
+
           return Stack(
             children: [
               FlutterMap(
@@ -365,83 +452,200 @@ class _MapScreenState extends State<MapScreen> {
                 options: MapOptions(
                   initialCenter: initialPos,
                   initialZoom: 14.0,
-                  onPositionChanged: (camera, hasGesture) {
-                    final newZoom = camera.zoom;
-                    bool crossedThreshold =
-                        (_currentZoom >= _zoomThreshold) !=
-                        (newZoom >= _zoomThreshold);
-                    _currentZoom = newZoom;
-                    if (crossedThreshold) {
-                      setState(() {});
-                    }
+                  onMapReady: () {
+                    _mapReady = true;
+                    _onLocationChanged();
                   },
                 ),
                 children: [
                   TileLayer(
                     urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                    subdomains: const ['a', 'b', 'c', 'd'],
                     userAgentPackageName: 'com.culturaldiscovery.app',
                   ),
+
+                  // Radius circle overlay
+                  if (currentLocation != null &&
+                      currentLocation.latitude != null &&
+                      currentLocation.longitude != null)
+                    CircleLayer(
+                      circles: [
+                        CircleMarker(
+                          point: mapState.routeDestination ??
+                              LatLng(
+                                currentLocation.latitude!,
+                                currentLocation.longitude!,
+                              ),
+                          radius: mapState.selectedRadius * 1000,
+                          useRadiusInMeter: true,
+                          color: const Color(0xFF005A60).withAlpha(20),
+                          borderColor: const Color(0xFF005A60).withAlpha(80),
+                          borderStrokeWidth: 2,
+                        ),
+                      ],
+                    ),
+
+                  // Route polyline
+                  if (mapState.routePolyline.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: mapState.routePolyline,
+                          strokeWidth: 4.0,
+                          color: const Color(0xFF005A60),
+                        ),
+                      ],
+                    ),
+
                   MarkerLayer(markers: markers),
                 ],
               ),
 
-              // Custom Floating Location Button
+              // Location name chip - hidden during routing
               Positioned(
-                bottom: 120, // Avoid bottom nav bar
+                top: MediaQuery.of(context).padding.top + 72,
+                left: 16,
+                child: Consumer<MapStateProvider>(
+                  builder: (context, ms, _) {
+                    if (ms.isDirectionPanelOpen || ms.hasActiveRoute) {
+                      return const SizedBox.shrink();
+                    }
+                    return const LocationNameChip();
+                  },
+                ),
+              ),
+
+              // Radius selector - hidden during routing
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 108,
+                left: 16,
+                child: Consumer<MapStateProvider>(
+                  builder: (context, ms, _) {
+                    if (ms.isDirectionPanelOpen || ms.hasActiveRoute) {
+                      return const SizedBox.shrink();
+                    }
+                    return RadiusSelectorWidget(
+                      onRadiusChanged: () => setState(() {}),
+                    );
+                  },
+                ),
+              ),
+
+              // Zoom controls + Direction button
+              Positioned(
+                bottom: 120,
                 right: 20,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FloatingActionButton(
-                      heroTag: 'zoom_in',
-                      backgroundColor: Colors.white,
-                      mini: true,
-                      child: const Icon(Icons.add, color: Color(0xFF005A60)),
-                      onPressed: () {
-                        final currentZoom = _mapController.camera.zoom;
-                        _mapController.move(
-                          _mapController.camera.center,
-                          currentZoom + 1,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    FloatingActionButton(
-                      heroTag: 'zoom_out',
-                      backgroundColor: Colors.white,
-                      mini: true,
-                      child: const Icon(Icons.remove, color: Color(0xFF005A60)),
-                      onPressed: () {
-                        final currentZoom = _mapController.camera.zoom;
-                        _mapController.move(
-                          _mapController.camera.center,
-                          currentZoom - 1,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    FloatingActionButton(
-                      heroTag: 'my_location',
-                      backgroundColor: Colors.white,
-                      child: const Icon(
-                        Icons.my_location,
-                        color: Color(0xFF005A60),
-                      ),
-                      onPressed: () {
-                        final currLoc = locationProvider.currentLocation;
-                        if (currLoc != null) {
-                          _mapController.move(
-                            LatLng(
-                              currLoc.latitude ?? 0.0,
-                              currLoc.longitude ?? 0.0,
-                            ),
-                            15.0,
-                          );
-                        }
-                      },
-                    ),
-                  ],
+                child: Consumer<MapStateProvider>(
+                  builder: (context, ms, _) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!ms.isDirectionPanelOpen && !ms.hasActiveRoute) ...[
+                          FloatingActionButton(
+                            heroTag: 'directions',
+                            backgroundColor: const Color(0xFF005A60),
+                            mini: true,
+                            onPressed: () => ms.setDirectionPanelOpen(true),
+                            child: const Icon(Icons.directions, color: Colors.white),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        FloatingActionButton(
+                          heroTag: 'zoom_in',
+                          backgroundColor: Colors.white,
+                          mini: true,
+                          child: const Icon(Icons.add, color: Color(0xFF005A60)),
+                          onPressed: () {
+                            _mapController.move(
+                              _mapController.camera.center,
+                              _mapController.camera.zoom + 1,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        FloatingActionButton(
+                          heroTag: 'zoom_out',
+                          backgroundColor: Colors.white,
+                          mini: true,
+                          child: const Icon(Icons.remove, color: Color(0xFF005A60)),
+                          onPressed: () {
+                            _mapController.move(
+                              _mapController.camera.center,
+                              _mapController.camera.zoom - 1,
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        FloatingActionButton(
+                          heroTag: 'my_location',
+                          backgroundColor: Colors.white,
+                          child: const Icon(
+                            Icons.my_location,
+                            color: Color(0xFF005A60),
+                          ),
+                          onPressed: () async {
+                            await locationProvider.refreshLocation();
+                            final currLoc = locationProvider.currentLocation;
+                            if (currLoc != null) {
+                              _mapController.move(
+                                LatLng(
+                                  currLoc.latitude ?? 0.0,
+                                  currLoc.longitude ?? 0.0,
+                                ),
+                                15.0,
+                              );
+                              if (currLoc.latitude != null &&
+                                  currLoc.longitude != null) {
+                                mapState.updateCurrentLocationName(
+                                  currLoc.latitude!,
+                                  currLoc.longitude!,
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+
+              // Direction panel
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: DirectionPanel(
+                  onRouteCalculated: () {
+                    if (currentLocation != null &&
+                        currentLocation.latitude != null &&
+                        currentLocation.longitude != null &&
+                        mapState.routeDestination != null) {
+                      final origin = LatLng(
+                        currentLocation.latitude!,
+                        currentLocation.longitude!,
+                      );
+                      _fitBoundsForRoute(origin, [
+                        ...mapState.waypoints.map((w) => w.latLng),
+                        mapState.routeDestination!,
+                      ]);
+                    }
+                    setState(() {});
+                  },
+                  onRouteClosed: () => setState(() {}),
+                ),
+              ),
+
+              // Search bar - on top of everything
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 12,
+                left: 16,
+                right: 16,
+                child: MapSearchBar(
+                  onDestinationSelected: (destination, name) {
+                    _mapController.move(destination, 15.0);
+                  },
                 ),
               ),
             ],

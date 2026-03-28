@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:location/location.dart' as loc;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,7 +13,6 @@ class LocationProvider extends ChangeNotifier {
   bool _isLoading = true;
   StreamSubscription<List<Map<String, dynamic>>>? _supabaseSubscription;
   final _supabase = Supabase.instance.client;
-
   loc.LocationData? get currentLocation => _currentLocation;
   List<LocationModel> get locations => _locations;
   bool get isLoading => _isLoading;
@@ -52,19 +50,21 @@ class LocationProvider extends ChangeNotifier {
 
     try {
       _currentLocation = await _locationService.getLocation();
-
-      // Listen for location changes
-      _locationService.onLocationChanged.listen((
-        loc.LocationData currentLocation,
-      ) {
-        _currentLocation = currentLocation;
-        notifyListeners();
-      });
     } catch (e) {
       debugPrint("Error getting location: $e");
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Refresh current location on demand (e.g. "My Location" button).
+  Future<void> refreshLocation() async {
+    try {
+      _currentLocation = await _locationService.getLocation();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error refreshing location: $e");
     }
   }
 
@@ -138,10 +138,10 @@ class LocationProvider extends ChangeNotifier {
     // 2. Cloud Data (Source of Truth): Listen to Supabase content additions.
     // We only listen when a user is actually logged in.
     try {
-      FirebaseAuth.instance.authStateChanges().listen((user) {
+      _supabase.auth.onAuthStateChange.listen((event) {
         _supabaseSubscription?.cancel();
 
-        if (user != null) {
+        if (event.session?.user != null) {
           _supabaseSubscription = _supabase
               .from('content')
               .stream(primaryKey: ['id'])

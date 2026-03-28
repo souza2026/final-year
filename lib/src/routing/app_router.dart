@@ -62,7 +62,7 @@ class AppRouter {
         // And they are trying to access an auth route (e.g., login page)
         if (isAuthRoute) {
           // Fetch their role and redirect them to the correct dashboard.
-          final role = await authService.getUserRole(user.uid);
+          final role = await authService.getUserRole(user.id);
           if (role == 'admin') {
             return '/admin';
           }

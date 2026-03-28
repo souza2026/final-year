@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:myapp/src/services/auth_service.dart';
 import 'dart:developer' as developer;
 
@@ -18,9 +19,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final user = Provider.of<AuthService>(context, listen: false).currentUser;
-    _nameController = TextEditingController(text: user?.displayName ?? '');
-    _photoURLController = TextEditingController(text: user?.photoURL ?? '');
+    _nameController = TextEditingController();
+    _photoURLController = TextEditingController();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final user = authService.currentUser;
+    if (user == null) return;
+    try {
+      final data = await Supabase.instance.client
+          .from('users')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      if (mounted && data != null) {
+        setState(() {
+          _nameController.text = data['username'] ?? '';
+          _photoURLController.text = data['photo_url'] ?? '';
+        });
+      }
+    } catch (e) {
+      developer.log('Error loading profile: $e');
+    }
   }
 
   @override

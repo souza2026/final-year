@@ -61,9 +61,7 @@ class TestAppRouter {
       }
 
       if (isLoggingIn) {
-        final userDoc = await authService.getUserDocument(user.uid);
-        final role =
-            (userDoc.data() as Map<String, dynamic>?)?['role'] as String?;
+        final role = await authService.getUserRole(user.id);
         if (role == 'admin') {
           return '/admin';
         } else {

@@ -1,66 +1,62 @@
 import 'dart:developer' as developer;
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
-  final auth.FirebaseAuth _firebaseAuth;
-  final FirebaseFirestore _firestore;
+  final SupabaseClient _supabase;
 
-  AuthService(this._firebaseAuth, this._firestore);
+  AuthService(this._supabase);
 
-  // Stream of user authentication state
-  Stream<auth.User?> get user => _firebaseAuth.authStateChanges();
+  /// Stream of auth state changes (emits User? on each change).
+  Stream<User?> get user =>
+      _supabase.auth.onAuthStateChange.map((event) => event.session?.user);
 
-  // Get current user
-  auth.User? get currentUser => _firebaseAuth.currentUser;
+  /// Current logged-in user (synchronous).
+  User? get currentUser => _supabase.auth.currentUser;
 
-  // Get user document from Firestore
-  Future<DocumentSnapshot> getUserDocument(String uid) async {
-    return await _firestore.collection('users').doc(uid).get();
-  }
-
-  // Get user role from Firestore
+  /// Get user role from the `users` table.
   Future<String?> getUserRole(String uid) async {
     try {
-      final doc = await getUserDocument(uid);
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>?;
-        return data?['role'];
-      }
-      return null;
+      final data =
+          await _supabase.from('users').select('role').eq('id', uid).maybeSingle();
+      return data?['role'] as String?;
     } catch (e) {
       developer.log('Error getting user role: $e');
       return null;
     }
   }
 
-  // Sign in with email and password
-  Future<auth.UserCredential> signInWithEmailAndPassword(
-    String email,
-    String password,
-  ) async {
-    try {
-      final credential = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      return credential;
-    } catch (e) {
-      developer.log('Failed to sign in: $e');
-      rethrow;
-    }
-  }
-
-  // New function to sign in and get user role
+  /// Sign in and return user + role.
   Future<Map<String, dynamic>> signInAndGetUserRole(
     String email,
     String password,
   ) async {
     try {
-      final credential = await signInWithEmailAndPassword(email, password);
-      final user = credential.user;
+      final response = await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      final user = response.user;
       if (user != null) {
-        final role = await getUserRole(user.uid);
+        // Check if users row exists
+        final existing = await _supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (existing != null) {
+          return {'user': user, 'role': existing['role']};
+        }
+
+        // Row missing — create it (handles accounts created before users table existed)
+        final role = (email == 'admin@myapp.com') ? 'admin' : 'user';
+        await _supabase.from('users').insert({
+          'id': user.id,
+          'email': email,
+          'username': email.split('@').first,
+          'role': role,
+          'photo_url': '',
+        });
         return {'user': user, 'role': role};
       }
       return {'user': null, 'role': null};
@@ -70,62 +66,55 @@ class AuthService {
     }
   }
 
-  // Sign up with email and password
-  Future<auth.User?> createUserWithEmailAndPassword(
+  /// Sign up, then insert a row into the `users` table.
+  Future<User?> createUserWithEmailAndPassword(
     String email,
     String password,
     String username,
   ) async {
     try {
-      final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+      final response = await _supabase.auth.signUp(
         email: email,
         password: password,
       );
 
-      if (credential.user != null) {
-        await credential.user!.updateDisplayName(username);
-
+      final user = response.user;
+      if (user != null) {
         // Determine role based on email
         String role = 'user';
         if (email == 'admin@myapp.com') {
           role = 'admin';
         }
 
-        await _firestore.collection('users').doc(credential.user!.uid).set({
-          'uid': credential.user!.uid,
+        await _supabase.from('users').insert({
+          'id': user.id,
           'email': email,
           'username': username,
-          'role': role, // Use the determined role
-          'createdAt': Timestamp.now(),
-          'photoURL': '',
+          'role': role,
+          'photo_url': '',
         });
       }
-      return credential.user;
+      return user;
     } catch (e) {
       developer.log('Failed to sign up: $e');
       rethrow;
     }
   }
 
-  // Update user profile
+  /// Update user profile (username and/or photo URL).
   Future<void> updateUserProfile({
     String? displayName,
     String? photoURL,
   }) async {
     try {
-      final user = _firebaseAuth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user != null) {
-        if (displayName != null) {
-          await user.updateDisplayName(displayName);
-          await _firestore.collection('users').doc(user.uid).update({
-            'username': displayName,
-          });
-        }
-        if (photoURL != null) {
-          await user.updatePhotoURL(photoURL);
-          await _firestore.collection('users').doc(user.uid).update({
-            'photoURL': photoURL,
-          });
+        final updates = <String, dynamic>{};
+        if (displayName != null) updates['username'] = displayName;
+        if (photoURL != null) updates['photo_url'] = photoURL;
+
+        if (updates.isNotEmpty) {
+          await _supabase.from('users').update(updates).eq('id', user.id);
         }
       }
     } catch (e) {
@@ -134,8 +123,8 @@ class AuthService {
     }
   }
 
-  // Sign out
+  /// Sign out.
   Future<void> signOut() async {
-    await _firebaseAuth.signOut();
+    await _supabase.auth.signOut();
   }
 }

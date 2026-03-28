@@ -35,7 +35,7 @@ class AdminHomeScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   // Header
                   Text(
-                    'Welcome \'${user?.displayName ?? 'Admin'}\'',
+                    'Welcome \'${user?.email ?? 'Admin'}\'',
                     style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
@@ -82,18 +82,8 @@ class AdminHomeScreen extends StatelessWidget {
                             ),
                             _buildAdminOption(
                               context,
-                              'Admin\nOption 2',
-                              () {}, // Placeholder
-                            ),
-                            _buildAdminOption(
-                              context,
-                              'Admin\nOption 3',
-                              () {}, // Placeholder
-                            ),
-                            _buildAdminOption(
-                              context,
-                              'Admin\nOption 4',
-                              () {}, // Placeholder
+                              'Edit\nProfile',
+                              () => context.go('/admin/edit-profile'),
                             ),
                           ],
                         ),

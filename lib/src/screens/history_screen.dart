@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../providers/location_provider.dart';
 
@@ -136,10 +137,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: imageUrl.startsWith('http')
-                        ? Image.network(
-                            imageUrl,
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            errorWidget: (context, url, error) =>
                                 const Center(
                                   child: Icon(Icons.error, color: Colors.white),
                                 ),
