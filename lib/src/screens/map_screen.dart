@@ -209,42 +209,98 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                     ),
                   const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      if (currentLocation != null &&
-                          currentLocation.latitude != null &&
-                          currentLocation.longitude != null) {
-                        final mapState = context.read<MapStateProvider>();
-                        final origin = LatLng(
-                          currentLocation.latitude!,
-                          currentLocation.longitude!,
-                        );
-                        final destination = LatLng(location.latitude, location.longitude);
-                        Navigator.pop(context);
-                        await mapState.selectDestination(origin, destination, location.name);
-                        _fitBoundsForRoute(origin, [destination]);
-                        setState(() {});
-                      }
+                  Builder(
+                    builder: (context) {
+                      final mapState = context.read<MapStateProvider>();
+                      final showAddStop = mapState.canAddStop;
+
+                      final getDirectionsButton = Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (currentLocation != null &&
+                                currentLocation.latitude != null &&
+                                currentLocation.longitude != null) {
+                              final origin = LatLng(
+                                currentLocation.latitude!,
+                                currentLocation.longitude!,
+                              );
+                              final destination = LatLng(location.latitude, location.longitude);
+                              Navigator.pop(context);
+                              await mapState.selectDestination(origin, destination, location.name);
+                              _fitBoundsForRoute(origin, [destination]);
+                              setState(() {});
+                            }
+                          },
+                          icon: const Icon(Icons.directions, color: Colors.white),
+                          label: Text(
+                            distanceText.isNotEmpty
+                                ? 'Get Directions ($distanceText)'
+                                : 'Get Directions',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF005A60),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                        ),
+                      );
+
+                      if (!showAddStop) return getDirectionsButton;
+
+                      return Row(
+                        children: [
+                          getDirectionsButton,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                if (currentLocation != null &&
+                                    currentLocation.latitude != null &&
+                                    currentLocation.longitude != null) {
+                                  final origin = LatLng(
+                                    currentLocation.latitude!,
+                                    currentLocation.longitude!,
+                                  );
+                                  final point = LatLng(location.latitude, location.longitude);
+                                  Navigator.pop(context);
+                                  await mapState.addWaypoint(origin, point, location.name);
+                                  final allPoints = [
+                                    ...mapState.waypoints.map((w) => w.latLng),
+                                    if (mapState.routeDestination != null) mapState.routeDestination!,
+                                  ];
+                                  _fitBoundsForRoute(origin, allPoints);
+                                  setState(() {});
+                                }
+                              },
+                              icon: const Icon(Icons.add_location_alt, color: Color(0xFF005A60)),
+                              label: Text(
+                                'Add Stop',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF005A60),
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFF005A60), width: 2),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
                     },
-                    icon: const Icon(Icons.directions, color: Colors.white),
-                    label: Text(
-                      distanceText.isNotEmpty
-                          ? 'Get Directions ($distanceText)'
-                          : 'Get Directions',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF005A60),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
                   ),
                 ],
               ),
