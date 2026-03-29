@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:location/location.dart' as loc;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
@@ -212,24 +211,19 @@ class _MapScreenState extends State<MapScreen> {
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
                     onPressed: () async {
-                      final Uri url = Uri.parse(
-                        'https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}',
-                      );
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(
-                          url,
-                          mode: LaunchMode.externalApplication,
+                      if (currentLocation != null &&
+                          currentLocation.latitude != null &&
+                          currentLocation.longitude != null) {
+                        final mapState = context.read<MapStateProvider>();
+                        final origin = LatLng(
+                          currentLocation.latitude!,
+                          currentLocation.longitude!,
                         );
-                      } else {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Could not open maps to show directions.',
-                              ),
-                            ),
-                          );
-                        }
+                        final destination = LatLng(location.latitude, location.longitude);
+                        Navigator.pop(context);
+                        await mapState.selectDestination(origin, destination, location.name);
+                        _fitBoundsForRoute(origin, [destination]);
+                        setState(() {});
                       }
                     },
                     icon: const Icon(Icons.directions, color: Colors.white),
@@ -387,59 +381,124 @@ class _MapScreenState extends State<MapScreen> {
           if (currentLocation != null &&
               currentLocation.latitude != null &&
               currentLocation.longitude != null) {
+            final userPoint = LatLng(
+              currentLocation.latitude!,
+              currentLocation.longitude!,
+            );
+            if (mapState.hasActiveRoute) {
+              // Show "A" label when route is active
+              markers.add(
+                Marker(
+                  point: userPoint,
+                  width: 36,
+                  height: 36,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF005A60),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black26, blurRadius: 4),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'A',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            } else {
+              // Default blue dot when no route
+              markers.add(
+                Marker(
+                  point: userPoint,
+                  width: 30,
+                  height: 30,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+
+          // Waypoint markers (B, C, D, ...)
+          for (int i = 0; i < mapState.waypoints.length; i++) {
+            final label = String.fromCharCode(66 + i); // B, C, D, ...
             markers.add(
               Marker(
-                point: LatLng(
-                  currentLocation.latitude!,
-                  currentLocation.longitude!,
-                ),
-                width: 30,
-                height: 30,
+                point: mapState.waypoints[i].latLng,
+                width: 36,
+                height: 36,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.blue,
+                    color: const Color(0xFF005A60),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
+                    border: Border.all(color: Colors.white, width: 2),
                     boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      ),
+                      BoxShadow(color: Colors.black26, blurRadius: 4),
                     ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ),
               ),
             );
           }
 
-          // Waypoint markers (orange)
-          for (final waypoint in mapState.waypoints) {
-            markers.add(
-              Marker(
-                point: waypoint.latLng,
-                width: 36,
-                height: 36,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Colors.orange,
-                  size: 36,
-                ),
-              ),
-            );
-          }
-
-          // Destination marker (red)
+          // Destination marker (last letter)
           if (mapState.routeDestination != null) {
+            final destLabel = String.fromCharCode(66 + mapState.waypoints.length); // next after waypoints
             markers.add(
               Marker(
                 point: mapState.routeDestination!,
-                width: 40,
-                height: 40,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Color(0xFFE53935),
-                  size: 40,
+                width: 36,
+                height: 36,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF005A60),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black26, blurRadius: 4),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      destLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             );
