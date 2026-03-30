@@ -12,7 +12,10 @@ import '../widgets/map/search_bar_widget.dart';
 import '../widgets/map/location_name_chip.dart';
 import '../widgets/map/radius_selector_widget.dart';
 import '../widgets/map/route_info_bar.dart'; // DirectionPanel
+import '../widgets/map/category_chips_widget.dart';
+import '../widgets/map/navigation_bar_widget.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -26,6 +29,8 @@ class _MapScreenState extends State<MapScreen> {
   bool _hasMovedToUserLocation = false;
   bool _mapReady = false;
   LocationProvider? _locationProviderRef;
+  StreamSubscription<loc.LocationData>? _navigationSubscription;
+  MapStateProvider? _mapStateRef;
 
   @override
   void initState() {
@@ -33,6 +38,8 @@ class _MapScreenState extends State<MapScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _locationProviderRef = Provider.of<LocationProvider>(context, listen: false);
       _locationProviderRef!.addListener(_onLocationChanged);
+      _mapStateRef = Provider.of<MapStateProvider>(context, listen: false);
+      _mapStateRef!.addListener(_onMapStateChanged);
       _fetchInitialLocationName();
     });
   }
@@ -40,6 +47,8 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _locationProviderRef?.removeListener(_onLocationChanged);
+    _mapStateRef?.removeListener(_onMapStateChanged);
+    _navigationSubscription?.cancel();
     super.dispose();
   }
 
@@ -74,6 +83,33 @@ class _MapScreenState extends State<MapScreen> {
         LatLng(currentLoc.latitude!, currentLoc.longitude!),
       );
     }
+  }
+
+  void _onMapStateChanged() {
+    final mapState = _mapStateRef;
+    if (mapState == null) return;
+    if (mapState.isNavigating && _navigationSubscription == null) {
+      _startLocationTracking();
+    } else if (!mapState.isNavigating && _navigationSubscription != null) {
+      _navigationSubscription?.cancel();
+      _navigationSubscription = null;
+    }
+  }
+
+  void _startLocationTracking() {
+    final locProvider = _locationProviderRef;
+    if (locProvider == null) return;
+    _navigationSubscription = locProvider.listenToLocationUpdates((locData) {
+      if (locData.latitude != null && locData.longitude != null) {
+        final mapState = _mapStateRef;
+        if (mapState == null) return;
+        final pos = LatLng(locData.latitude!, locData.longitude!);
+        mapState.updateNavigationPosition(pos);
+        if (mapState.isNavigating) {
+          _mapController.move(pos, _mapController.camera.zoom);
+        }
+      }
+    });
   }
 
   void _fitBoundsForRoute(LatLng origin, List<LatLng> allPoints) {
@@ -212,55 +248,13 @@ class _MapScreenState extends State<MapScreen> {
                   Builder(
                     builder: (context) {
                       final mapState = context.read<MapStateProvider>();
-                      final showAddStop = mapState.canAddStop;
+                      final canAddStop = mapState.canAddStop;
 
-                      final getDirectionsButton = Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            if (currentLocation != null &&
-                                currentLocation.latitude != null &&
-                                currentLocation.longitude != null) {
-                              final origin = LatLng(
-                                currentLocation.latitude!,
-                                currentLocation.longitude!,
-                              );
-                              final destination = LatLng(location.latitude, location.longitude);
-                              Navigator.pop(context);
-                              await mapState.selectDestination(origin, destination, location.name);
-                              _fitBoundsForRoute(origin, [destination]);
-                              setState(() {});
-                            }
-                          },
-                          icon: const Icon(Icons.directions, color: Colors.white),
-                          label: Text(
-                            distanceText.isNotEmpty
-                                ? 'Get Directions ($distanceText)'
-                                : 'Get Directions',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF005A60),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 2,
-                          ),
-                        ),
-                      );
-
-                      if (!showAddStop) return getDirectionsButton;
-
-                      return Row(
+                      return Column(
                         children: [
-                          getDirectionsButton,
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
                               onPressed: () async {
                                 if (currentLocation != null &&
                                     currentLocation.latitude != null &&
@@ -269,28 +263,76 @@ class _MapScreenState extends State<MapScreen> {
                                     currentLocation.latitude!,
                                     currentLocation.longitude!,
                                   );
-                                  final point = LatLng(location.latitude, location.longitude);
+                                  final destination = LatLng(location.latitude, location.longitude);
                                   Navigator.pop(context);
-                                  await mapState.addWaypoint(origin, point, location.name);
-                                  final allPoints = [
-                                    ...mapState.waypoints.map((w) => w.latLng),
-                                    if (mapState.routeDestination != null) mapState.routeDestination!,
-                                  ];
-                                  _fitBoundsForRoute(origin, allPoints);
+                                  await mapState.selectDestination(origin, destination, location.name);
+                                  _fitBoundsForRoute(origin, [destination]);
                                   setState(() {});
                                 }
                               },
-                              icon: const Icon(Icons.add_location_alt, color: Color(0xFF005A60)),
+                              icon: const Icon(Icons.directions, color: Colors.white),
+                              label: Text(
+                                distanceText.isNotEmpty
+                                    ? 'Get Directions ($distanceText)'
+                                    : 'Get Directions',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF005A60),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: canAddStop
+                                  ? () async {
+                                      if (currentLocation != null &&
+                                          currentLocation.latitude != null &&
+                                          currentLocation.longitude != null) {
+                                        final origin = LatLng(
+                                          currentLocation.latitude!,
+                                          currentLocation.longitude!,
+                                        );
+                                        final point = LatLng(location.latitude, location.longitude);
+                                        Navigator.pop(context);
+                                        await mapState.addWaypoint(origin, point, location.name);
+                                        final allPoints = [
+                                          ...mapState.waypoints.map((w) => w.latLng),
+                                          if (mapState.routeDestination != null) mapState.routeDestination!,
+                                        ];
+                                        _fitBoundsForRoute(origin, allPoints);
+                                        setState(() {});
+                                      }
+                                    }
+                                  : null,
+                              icon: Icon(
+                                Icons.add_location_alt,
+                                color: canAddStop ? const Color(0xFF005A60) : Colors.grey[400],
+                              ),
                               label: Text(
                                 'Add Stop',
                                 style: GoogleFonts.inter(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF005A60),
+                                  color: canAddStop ? const Color(0xFF005A60) : Colors.grey[400],
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFF005A60), width: 2),
+                                side: BorderSide(
+                                  color: canAddStop ? const Color(0xFF005A60) : Colors.grey[300]!,
+                                  width: 2,
+                                ),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -335,14 +377,17 @@ class _MapScreenState extends State<MapScreen> {
           // Read mapState without listening - overlay widgets have their own listeners
           final mapState = context.read<MapStateProvider>();
 
+          // Filter locations by category
+          final filteredLocations = mapState.filterLocations(locationProvider.locations);
+
           // Calculate nearby count silently
           final center = mapState.routeDestination ?? initialPos;
-          mapState.calculateNearbyCountSilent(locationProvider.locations, center);
+          mapState.calculateNearbyCountSilent(filteredLocations, center);
 
           // Build markers based on radius
           const distanceCalc = Distance();
           final radiusMeters = mapState.selectedRadius * 1000;
-          List<Marker> markers = locationProvider.locations.map((loc) {
+          List<Marker> markers = filteredLocations.map((loc) {
             final locPoint = LatLng(loc.latitude, loc.longitude);
             final metersFromCenter = distanceCalc(center, locPoint);
             final isInsideRadius = metersFromCenter <= radiusMeters;
@@ -413,19 +458,24 @@ class _MapScreenState extends State<MapScreen> {
             } else {
               return Marker(
                 point: locPoint,
-                width: 16,
-                height: 16,
+                width: 40,
+                height: 40,
                 child: GestureDetector(
                   onTap: () =>
                       _showLocationDetails(context, loc, currentLocation),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF005A60),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black26, blurRadius: 2),
-                      ],
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF005A60),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 2),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -617,13 +667,28 @@ class _MapScreenState extends State<MapScreen> {
                 ],
               ),
 
-              // Location name chip - hidden during routing
+              // Category chips - below search bar, hidden during routing/navigation
               Positioned(
-                top: MediaQuery.of(context).padding.top + 72,
+                top: MediaQuery.of(context).padding.top + 64,
+                left: 16,
+                right: 16,
+                child: Consumer<MapStateProvider>(
+                  builder: (context, ms, _) {
+                    if (ms.isDirectionPanelOpen || ms.hasActiveRoute || ms.isNavigating) {
+                      return const SizedBox.shrink();
+                    }
+                    return const CategoryChipsWidget();
+                  },
+                ),
+              ),
+
+              // Location name chip - hidden during routing/navigation
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 112,
                 left: 16,
                 child: Consumer<MapStateProvider>(
                   builder: (context, ms, _) {
-                    if (ms.isDirectionPanelOpen || ms.hasActiveRoute) {
+                    if (ms.isDirectionPanelOpen || ms.hasActiveRoute || ms.isNavigating) {
                       return const SizedBox.shrink();
                     }
                     return const LocationNameChip();
@@ -631,13 +696,13 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
 
-              // Radius selector - hidden during routing
+              // Radius selector - hidden during routing/navigation
               Positioned(
-                top: MediaQuery.of(context).padding.top + 108,
+                top: MediaQuery.of(context).padding.top + 148,
                 left: 16,
                 child: Consumer<MapStateProvider>(
                   builder: (context, ms, _) {
-                    if (ms.isDirectionPanelOpen || ms.hasActiveRoute) {
+                    if (ms.isDirectionPanelOpen || ms.hasActiveRoute || ms.isNavigating) {
                       return const SizedBox.shrink();
                     }
                     return RadiusSelectorWidget(
@@ -752,14 +817,38 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
 
-              // Search bar - on top of everything
+              // Search bar - on top of everything, hidden during navigation
               Positioned(
                 top: MediaQuery.of(context).padding.top + 12,
                 left: 16,
                 right: 16,
-                child: MapSearchBar(
-                  onDestinationSelected: (destination, name) {
-                    _mapController.move(destination, 15.0);
+                child: Consumer<MapStateProvider>(
+                  builder: (context, ms, _) {
+                    if (ms.isNavigating) return const SizedBox.shrink();
+                    return MapSearchBar(
+                      onDestinationSelected: (destination, name) {
+                        _mapController.move(destination, 15.0);
+                      },
+                    );
+                  },
+                ),
+              ),
+
+              // Navigation bar - shown during active navigation
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 12,
+                left: 16,
+                right: 16,
+                child: Consumer<MapStateProvider>(
+                  builder: (context, ms, _) {
+                    if (!ms.isNavigating) return const SizedBox.shrink();
+                    return NavigationBarWidget(
+                      onStopNavigation: () {
+                        ms.stopNavigation();
+                        _navigationSubscription?.cancel();
+                        _navigationSubscription = null;
+                      },
+                    );
                   },
                 ),
               ),

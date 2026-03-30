@@ -81,6 +81,7 @@ class LocationProvider extends ChangeNotifier {
         'latitude': newLocation.latitude,
         'longitude': newLocation.longitude,
         'images': newLocation.images,
+        'category': newLocation.category,
         'createdAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {
@@ -106,6 +107,7 @@ class LocationProvider extends ChangeNotifier {
           images: item['images'] != null
               ? List<String>.from(item['images'])
               : [],
+          category: item['category'] ?? '',
         );
       }).toList();
 
@@ -124,6 +126,7 @@ class LocationProvider extends ChangeNotifier {
               images: item['images'] != null
                   ? List<String>.from(item['images'])
                   : [],
+              category: item['category'] ?? '',
             );
           }),
         );
@@ -170,6 +173,7 @@ class LocationProvider extends ChangeNotifier {
                                     row['imageUrl'] != null
                                 ? [row['imageUrl']]
                                 : []),
+                      category: row['category'] ?? '',
                     );
                   }).toList();
 
@@ -185,6 +189,13 @@ class LocationProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint("Error setting up location auth listener: $e");
     }
+  }
+
+  /// Listen to real-time location updates (for navigation tracking).
+  StreamSubscription<loc.LocationData> listenToLocationUpdates(
+    void Function(loc.LocationData) callback,
+  ) {
+    return _locationService.onLocationChanged.listen(callback);
   }
 
   @override
@@ -213,6 +224,7 @@ class LocationProvider extends ChangeNotifier {
               ? item['images'][0]
               : null,
           'images': item['images'] ?? [],
+          'category': item['category'] ?? '',
           'createdAt': DateTime.now().toIso8601String(),
         });
       }

@@ -1,16 +1,19 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import '../models/route_step_model.dart';
 
 class RouteResult {
   final List<LatLng> polylinePoints;
   final double distanceMeters;
   final double durationSeconds;
+  final List<RouteStep> steps;
 
   RouteResult({
     required this.polylinePoints,
     required this.distanceMeters,
     required this.durationSeconds,
+    this.steps = const [],
   });
 
   double get distanceKm => distanceMeters / 1000;
@@ -31,7 +34,7 @@ class RoutingService {
           .join(';');
       final url =
           '$_osrmBase/route/v1/driving/$coords'
-          '?overview=full&geometries=geojson';
+          '?overview=full&geometries=geojson&steps=true';
 
       final response = await http.get(
         Uri.parse(url),
@@ -53,10 +56,33 @@ class RoutingService {
             );
           }).toList();
 
+          // Parse turn-by-turn steps
+          final List<RouteStep> steps = [];
+          final legs = route['legs'] as List? ?? [];
+          for (final leg in legs) {
+            final legSteps = leg['steps'] as List? ?? [];
+            for (final step in legSteps) {
+              final maneuver = step['maneuver'] as Map<String, dynamic>? ?? {};
+              final location = maneuver['location'] as List? ?? [0, 0];
+              steps.add(RouteStep(
+                streetName: step['name'] ?? '',
+                distanceMeters: (step['distance'] as num?)?.toDouble() ?? 0,
+                durationSeconds: (step['duration'] as num?)?.toDouble() ?? 0,
+                maneuverType: maneuver['type'] ?? '',
+                maneuverModifier: maneuver['modifier'] ?? '',
+                maneuverLocation: LatLng(
+                  (location[1] as num).toDouble(),
+                  (location[0] as num).toDouble(),
+                ),
+              ));
+            }
+          }
+
           return RouteResult(
             polylinePoints: polyline,
             distanceMeters: (route['distance'] as num).toDouble(),
             durationSeconds: (route['duration'] as num).toDouble(),
+            steps: steps,
           );
         }
       }

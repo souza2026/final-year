@@ -7,6 +7,7 @@ class LocationModel {
   final double longitude;
   final String description;
   final List<String> images;
+  final String category;
 
   LocationModel({
     required this.id,
@@ -15,6 +16,7 @@ class LocationModel {
     required this.longitude,
     required this.description,
     required this.images,
+    this.category = '',
   });
 
   factory LocationModel.fromMap(Map<String, dynamic> map) {
@@ -25,6 +27,7 @@ class LocationModel {
       longitude: map['longitude']?.toDouble() ?? 0.0,
       description: map['description'] ?? '',
       images: List<String>.from(map['images'] ?? []),
+      category: map['category'] ?? '',
     );
   }
 

@@ -8,7 +8,8 @@
     "images": [
       "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/14/02/d5/7b/hall.jpg?w=900&h=500&s=1",
       "https://letsgoa.co.in/Admin/api/uploads/activity_packages_media/251/attachments/web/freepik__enhance__10618.jpeg"
-    ]
+    ],
+    "category": "heritage"
   },
   {
     "id": "2",
@@ -19,7 +20,8 @@
     "images": [
       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRlPPvBzV8e24YgWG4EzWAGf96D-gKKZGb5tg&s",
       "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/06/77/36/ac/caption.jpg?w=900&h=500&s=1"
-    ]
+    ],
+    "category": "churches"
   },
   {
     "id": "3",
@@ -30,7 +32,8 @@
     "images": [
       "https://chalbanjare.com/crm/sys_images/Colva_Beach1759734932.webp",
       "https://www.explorebees.com/uploads/Colva%20Beach%20(1).jpg"
-    ]
+    ],
+    "category": "beaches"
   },
   {
     "id": "4",
@@ -41,7 +44,8 @@
     "images": [
       "https://s7ap1.scene7.com/is/image/incredibleindia/goa-chitra-museum-goa-1-musthead-hero?qlt=82&ts=1742173887122",
       "https://lh5.googleusercontent.com/proxy/yofLXvgEd1Gen0dRnwbdFRBPlHHRxj8s-ite_IwNSgvrpiPWW2p_9kYOG5YrikCkSytA4FyrZlnPMYI"
-    ]
+    ],
+    "category": "museums"
   },
   {
     "id": "5",
@@ -52,6 +56,7 @@
     "images": [
       "https://www.trawell.in/admin/images/upload/121905704HouseOfSevenGables_Main.png",
       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRMpTuyoI7Vxu66_fVFtBdvbRAkTifgIFGTDg&s"
-    ]
+    ],
+    "category": "heritage"
   }
 ]

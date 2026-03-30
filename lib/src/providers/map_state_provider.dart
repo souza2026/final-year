@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/location_model.dart';
 import '../models/waypoint_model.dart';
 import '../services/geocoding_service.dart';
+import 'package:myapp/src/models/route_step_model.dart';
 import '../services/routing_service.dart';
 
 class SearchResult {
@@ -44,8 +45,16 @@ class MapStateProvider extends ChangeNotifier {
   bool _isAddingStop = false;
   static const int maxWaypoints = 3;
 
+  // Navigation
+  List<RouteStep> _routeSteps = [];
+  bool _isNavigating = false;
+  int _currentStepIndex = 0;
+
   // Direction panel
   bool _isDirectionPanelOpen = false;
+
+  // Category filter
+  String _selectedCategory = 'all';
 
   // Radius
   double _selectedRadius = 2.0; // km
@@ -71,6 +80,18 @@ class MapStateProvider extends ChangeNotifier {
   int get nearbyCount => _nearbyCount;
   bool get hasActiveRoute => _routePolyline.isNotEmpty;
   bool get isDirectionPanelOpen => _isDirectionPanelOpen;
+  String get selectedCategory => _selectedCategory;
+  List<RouteStep> get routeSteps => List.unmodifiable(_routeSteps);
+  bool get isNavigating => _isNavigating;
+  int get currentStepIndex => _currentStepIndex;
+  RouteStep? get currentStep =>
+      _isNavigating && _currentStepIndex < _routeSteps.length
+          ? _routeSteps[_currentStepIndex]
+          : null;
+  RouteStep? get nextStep =>
+      _isNavigating && _currentStepIndex + 1 < _routeSteps.length
+          ? _routeSteps[_currentStepIndex + 1]
+          : null;
 
   /// Reverse geocode current location to get a place name.
   void updateCurrentLocationName(double lat, double lng) {
@@ -166,6 +187,7 @@ class MapStateProvider extends ChangeNotifier {
       _routePolyline = result.polylinePoints;
       _routeDistanceKm = result.distanceKm;
       _routeDurationMin = result.durationMinutes;
+      _routeSteps = result.steps;
     } else {
       // Fallback: straight line through all points
       _routePolyline = points;
@@ -176,6 +198,7 @@ class MapStateProvider extends ChangeNotifier {
       }
       _routeDistanceKm = totalDist / 1000;
       _routeDurationMin = 0;
+      _routeSteps = [];
     }
     _isLoadingRoute = false;
     notifyListeners();
@@ -202,6 +225,9 @@ class MapStateProvider extends ChangeNotifier {
     _waypoints = [];
     _routeDistanceKm = 0;
     _routeDurationMin = 0;
+    _routeSteps = [];
+    _isNavigating = false;
+    _currentStepIndex = 0;
     _isLoadingRoute = false;
     _isAddingStop = false;
     _isDirectionPanelOpen = false;
@@ -242,6 +268,72 @@ class MapStateProvider extends ChangeNotifier {
       final meters = distance(center, LatLng(loc.latitude, loc.longitude));
       return meters <= _selectedRadius * 1000;
     }).length;
+  }
+
+  // ===================== CATEGORY FILTER =====================
+
+  void setCategory(String category) {
+    _selectedCategory = category;
+    notifyListeners();
+  }
+
+  List<LocationModel> filterLocations(List<LocationModel> locations) {
+    if (_selectedCategory == 'all' || _selectedCategory.isEmpty) {
+      return locations;
+    }
+    return locations.where((loc) => loc.category == _selectedCategory).toList();
+  }
+
+  // ===================== NAVIGATION =====================
+
+  void startNavigation() {
+    if (_routeSteps.isEmpty) return;
+    _isNavigating = true;
+    _currentStepIndex = 0;
+    notifyListeners();
+  }
+
+  void stopNavigation() {
+    _isNavigating = false;
+    _currentStepIndex = 0;
+    notifyListeners();
+  }
+
+  void updateNavigationPosition(LatLng position) {
+    if (!_isNavigating || _routeSteps.isEmpty) return;
+
+    const distance = Distance();
+
+    // Check if we should advance to next step
+    if (_currentStepIndex + 1 < _routeSteps.length) {
+      final nextStepLocation = _routeSteps[_currentStepIndex + 1].maneuverLocation;
+      final distToNext = distance(position, nextStepLocation);
+      if (distToNext < 30) {
+        _currentStepIndex++;
+        notifyListeners();
+        return;
+      }
+    }
+
+    // Check if arrived at final destination
+    if (_currentStepIndex == _routeSteps.length - 1) {
+      final lastStep = _routeSteps.last;
+      if (lastStep.maneuverType == 'arrive') {
+        final distToEnd = distance(position, lastStep.maneuverLocation);
+        if (distToEnd < 50) {
+          stopNavigation();
+          return;
+        }
+      }
+    }
+
+    notifyListeners();
+  }
+
+  double distanceToNextManeuver(LatLng currentPosition) {
+    if (!_isNavigating || _currentStepIndex + 1 >= _routeSteps.length) return 0;
+    const dist = Distance();
+    return dist(currentPosition, _routeSteps[_currentStepIndex + 1].maneuverLocation);
   }
 
   @override

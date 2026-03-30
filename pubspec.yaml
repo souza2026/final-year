@@ -38,6 +38,7 @@ dependencies:
   go_router: ^17.0.0
   provider: ^6.1.5+1
   google_fonts: ^6.3.2
+  intl: any
   geolocator: ^14.0.2
   latlong2: ^0.9.1
   image_picker: ^1.2.1

@@ -3,6 +3,7 @@ class UserModel {
   final String email;
   final String role;
   final String username;
+  final String photoUrl;
   final DateTime createdAt;
 
   UserModel({
@@ -10,6 +11,7 @@ class UserModel {
     required this.email,
     required this.role,
     required this.username,
+    required this.photoUrl,
     required this.createdAt,
   });
 
@@ -20,6 +22,7 @@ class UserModel {
       email: data['email'] ?? '',
       role: data['role'] ?? 'user',
       username: data['username'] ?? '',
+      photoUrl: data['photo_url'] ?? '',
       createdAt: DateTime.tryParse(data['created_at'] ?? '') ?? DateTime.now(),
     );
   }

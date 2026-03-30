@@ -565,6 +565,23 @@ class _DirectionPanelState extends State<DirectionPanel>
                             ],
                           ),
                         ),
+                        if (mapState.routeSteps.isNotEmpty && !mapState.isNavigating)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ElevatedButton.icon(
+                              onPressed: () => mapState.startNavigation(),
+                              icon: const Icon(Icons.navigation, size: 16),
+                              label: Text('Start', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF005A60),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ),
                         GestureDetector(
                           onTap: () => _clearRoute(mapState),
                           child: Container(
