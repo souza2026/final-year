@@ -234,4 +234,28 @@ class LocationProvider extends ChangeNotifier {
       debugPrint("Error importing JSON: $e");
     }
   }
+
+  /// One-time helper to backfill categories from local JSON into Supabase.
+  Future<void> updateLocationCategories() async {
+    try {
+      final String jsonString = await rootBundle.loadString(
+        'assets/data/locations.json',
+      );
+      final List<dynamic> jsonResponses = jsonDecode(jsonString);
+
+      for (var item in jsonResponses) {
+        final String title = item['name'] ?? '';
+        final String category = item['category'] ?? '';
+        if (title.isNotEmpty && category.isNotEmpty) {
+          await _supabase
+              .from('content')
+              .update({'category': category})
+              .eq('title', title);
+        }
+      }
+      debugPrint('Categories updated successfully');
+    } catch (e) {
+      debugPrint('Error updating categories: $e');
+    }
+  }
 }

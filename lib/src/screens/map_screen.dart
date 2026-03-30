@@ -356,8 +356,8 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Consumer<LocationProvider>(
-        builder: (context, locationProvider, child) {
+      body: Consumer2<LocationProvider, MapStateProvider>(
+        builder: (context, locationProvider, mapState, child) {
           if (locationProvider.isLoading) {
             return const Center(
               child: CircularProgressIndicator(
@@ -373,9 +373,6 @@ class _MapScreenState extends State<MapScreen> {
                   currentLocation.longitude ?? 0.0,
                 )
               : const LatLng(15.261374, 74.043374);
-
-          // Read mapState without listening - overlay widgets have their own listeners
-          final mapState = context.read<MapStateProvider>();
 
           // Filter locations by category
           final filteredLocations = mapState.filterLocations(locationProvider.locations);
