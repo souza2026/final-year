@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../constants/categories.dart';
 
 class DetailedEditScreen extends StatefulWidget {
   final String docId;
@@ -22,6 +23,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
 
   File? _image;
   String? _imageUrl;
+  String? _selectedCategory;
   bool _isLoading = false;
   bool _isDeleting = false;
 
@@ -48,6 +50,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
         _descriptionController.text = doc['description'] ?? '';
         _latitudeController.text = (doc['latitude'] ?? 0.0).toString();
         _longitudeController.text = (doc['longitude'] ?? 0.0).toString();
+        _selectedCategory = doc['category'] as String?;
         setState(() {
           _imageUrl =
               doc['imageUrl'] ??
@@ -113,6 +116,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
               'description': _descriptionController.text,
               'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
               'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
+              'category': _selectedCategory ?? '',
               'imageUrl': newImageUrl,
               'images': [newImageUrl], // keeping images array in sync
             })
@@ -225,6 +229,54 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Category',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    decoration: InputDecoration(
+                      labelText: 'Select Category',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF006A6A),
+                          width: 2.0,
+                        ),
+                      ),
+                    ),
+                    items: LocationCategories.chips
+                        .where((c) => c['key'] != 'all')
+                        .map(
+                          (c) => DropdownMenuItem<String>(
+                            value: c['key'] as String,
+                            child: Row(
+                              children: [
+                                Icon(c['icon'] as IconData, size: 20),
+                                const SizedBox(width: 8),
+                                Text(c['label'] as String),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCategory = value;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a category';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 32),
                   Row(

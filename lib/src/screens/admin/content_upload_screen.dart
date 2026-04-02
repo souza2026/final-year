@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/location_provider.dart';
 import '../../models/location_model.dart';
+import '../../constants/categories.dart';
 
 class ContentUploadScreen extends StatefulWidget {
   const ContentUploadScreen({super.key});
@@ -103,6 +104,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         latitude: double.tryParse(formData['latitude'].toString()) ?? 15.2993,
         longitude: double.tryParse(formData['longitude'].toString()) ?? 73.9814,
         images: [imageUrl],
+        category: formData['category'] ?? '',
       );
 
       // Save to Supabase (via LocationProvider)
@@ -262,6 +264,50 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      FormBuilderDropdown<String>(
+                        name: 'category',
+                        decoration: InputDecoration(
+                          hintText: 'Select Category',
+                          filled: true,
+                          fillColor: Colors.white.withAlpha(204),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20.0),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20.0),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20.0),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF004D40),
+                              width: 2.0,
+                            ),
+                          ),
+                        ),
+                        validator: FormBuilderValidators.required(),
+                        items: LocationCategories.chips
+                            .where((c) => c['key'] != 'all')
+                            .map(
+                              (c) => DropdownMenuItem<String>(
+                                value: c['key'] as String,
+                                child: Row(
+                                  children: [
+                                    Icon(c['icon'] as IconData, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(c['label'] as String),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
                       ),
                       const SizedBox(height: 32),
                       ElevatedButton(
