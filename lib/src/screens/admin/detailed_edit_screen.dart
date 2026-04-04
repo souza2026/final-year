@@ -18,11 +18,12 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
+  late TextEditingController _longDescriptionController;
   late TextEditingController _latitudeController;
   late TextEditingController _longitudeController;
 
-  File? _image;
-  String? _imageUrl;
+  List<String> _existingImageUrls = [];
+  final List<File> _newImages = [];
   String? _selectedCategory;
   bool _isLoading = false;
   bool _isDeleting = false;
@@ -32,6 +33,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
     super.initState();
     _titleController = TextEditingController();
     _descriptionController = TextEditingController();
+    _longDescriptionController = TextEditingController();
     _latitudeController = TextEditingController();
     _longitudeController = TextEditingController();
     _loadData();
@@ -48,15 +50,20 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
       if (doc != null) {
         _titleController.text = doc['title'] ?? '';
         _descriptionController.text = doc['description'] ?? '';
+        _longDescriptionController.text = doc['longDescription'] ?? '';
         _latitudeController.text = (doc['latitude'] ?? 0.0).toString();
         _longitudeController.text = (doc['longitude'] ?? 0.0).toString();
         _selectedCategory = doc['category'] as String?;
+
+        final List<String> images = [];
+        if (doc['images'] != null && doc['images'] is List) {
+          images.addAll(List<String>.from(doc['images']));
+        } else if (doc['imageUrl'] != null) {
+          images.add(doc['imageUrl'] as String);
+        }
+
         setState(() {
-          _imageUrl =
-              doc['imageUrl'] ??
-              (doc['images'] != null && doc['images'].isNotEmpty
-                  ? doc['images'][0]
-                  : null);
+          _existingImageUrls = images;
         });
       }
     } catch (e) {
@@ -64,15 +71,25 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-    );
-    if (pickedFile != null) {
+  Future<void> _pickNewImages() async {
+    final pickedFiles = await ImagePicker().pickMultiImage();
+    if (pickedFiles.isNotEmpty) {
       setState(() {
-        _image = File(pickedFile.path);
+        _newImages.addAll(pickedFiles.map((f) => File(f.path)));
       });
     }
+  }
+
+  void _removeExistingImage(int index) {
+    setState(() {
+      _existingImageUrls.removeAt(index);
+    });
+  }
+
+  void _removeNewImage(int index) {
+    setState(() {
+      _newImages.removeAt(index);
+    });
   }
 
   Future<String?> _uploadImage(File image) async {
@@ -98,36 +115,46 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
   Future<void> _updateContent() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_existingImageUrls.isEmpty && _newImages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add at least one image')),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    String? newImageUrl = _imageUrl;
-    if (_image != null) {
-      newImageUrl = await _uploadImage(_image!);
+    // Upload new images
+    final List<String> allImageUrls = List.from(_existingImageUrls);
+    for (final image in _newImages) {
+      final url = await _uploadImage(image);
+      if (url != null) {
+        allImageUrls.add(url);
+      }
     }
 
-    if (newImageUrl != null) {
-      try {
-        await Supabase.instance.client
-            .from('content')
-            .update({
-              'title': _titleController.text,
-              'description': _descriptionController.text,
-              'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
-              'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
-              'category': _selectedCategory ?? '',
-              'imageUrl': newImageUrl,
-              'images': [newImageUrl], // keeping images array in sync
-            })
-            .eq('id', widget.docId);
+    try {
+      await Supabase.instance.client
+          .from('content')
+          .update({
+            'title': _titleController.text,
+            'description': _descriptionController.text,
+            'longDescription': _longDescriptionController.text,
+            'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
+            'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
+            'category': _selectedCategory ?? '',
+            'imageUrl': allImageUrls.isNotEmpty ? allImageUrls.first : null,
+            'images': allImageUrls,
+          })
+          .eq('id', widget.docId);
 
-        if (mounted) {
-          context.pop();
-        }
-      } catch (e) {
-        debugPrint("Update error: $e");
+      if (mounted) {
+        context.pop();
       }
+    } catch (e) {
+      debugPrint("Update error: $e");
     }
 
     setState(() {
@@ -159,6 +186,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _longDescriptionController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
     super.dispose();
@@ -196,14 +224,21 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildImagePicker(),
+                  _buildImageSection(),
                   const SizedBox(height: 24),
                   _buildTextField(_titleController, 'Site Title'),
                   const SizedBox(height: 16),
                   _buildTextField(
                     _descriptionController,
-                    'Data About The Site.....',
-                    maxLines: 5,
+                    'Short Description',
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    _longDescriptionController,
+                    'Detailed History / Long Description',
+                    maxLines: 8,
+                    isRequired: false,
                   ),
                   const SizedBox(height: 24),
                   Text(
@@ -296,83 +331,137 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
     );
   }
 
-  Widget _buildImagePicker() {
-    return Container(
-      height: 120,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withAlpha(128),
-        borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.onSurface.withAlpha(51),
-          width: 1.5,
+  Widget _buildImageSection() {
+    final totalImages = _existingImageUrls.length + _newImages.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Images ($totalImages)',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          // Site Picture
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: const Color(0xFF006A6A),
-            ),
-            child: _imageUrl != null && _imageUrl!.isNotEmpty
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12.0),
-                    child: Image.network(
-                      _imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.broken_image, color: Colors.white),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 110,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: totalImages + 1,
+            itemBuilder: (context, index) {
+              // Add button at the end
+              if (index == totalImages) {
+                return GestureDetector(
+                  onTap: _pickNewImages,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: const Color(0xFF006A6A),
                     ),
-                  )
-                : const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.camera_alt, color: Colors.white),
-                      Text(
-                        'Site Picture',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white, fontSize: 10),
-                      ),
-                    ],
-                  ),
-          ),
-          // Upload Photos
-          GestureDetector(
-            onTap: _pickImage,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: const Color(0xFF006A6A),
-              ),
-              child: _image != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12.0),
-                      child: Image.file(_image!, fit: BoxFit.cover),
-                    )
-                  : const Column(
+                    child: const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.cloud_upload, color: Colors.white),
+                        Icon(Icons.add_photo_alternate, color: Colors.white),
+                        SizedBox(height: 4),
                         Text(
-                          'Upload Photo',
-                          textAlign: TextAlign.center,
+                          'Add More',
                           style: TextStyle(color: Colors.white, fontSize: 10),
                         ),
                       ],
                     ),
-            ),
+                  ),
+                );
+              }
+
+              // Existing images
+              if (index < _existingImageUrls.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFF006A6A),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            _existingImageUrls[index],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.broken_image,
+                                    color: Colors.white),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: GestureDetector(
+                          onTap: () => _removeExistingImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close,
+                                size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // New images
+              final newIndex = index - _existingImageUrls.length;
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green, width: 2),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(
+                          _newImages[newIndex],
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: GestureDetector(
+                        onTap: () => _removeNewImage(newIndex),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close,
+                              size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -381,6 +470,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
     String label, {
     int maxLines = 1,
     TextInputType? keyboardType,
+    bool isRequired = true,
   }) {
     return TextFormField(
       controller: controller,
@@ -391,20 +481,22 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide(color: const Color(0xFF006A6A), width: 2.0),
+          borderSide: const BorderSide(color: Color(0xFF006A6A), width: 2.0),
         ),
       ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter a $label';
-        }
-        if (keyboardType == TextInputType.number) {
-          if (double.tryParse(value) == null) {
-            return 'Please enter a valid number';
-          }
-        }
-        return null;
-      },
+      validator: isRequired
+          ? (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter a $label';
+              }
+              if (keyboardType == TextInputType.number) {
+                if (double.tryParse(value) == null) {
+                  return 'Please enter a valid number';
+                }
+              }
+              return null;
+            }
+          : null,
     );
   }
 

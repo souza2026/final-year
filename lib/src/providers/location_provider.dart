@@ -81,6 +81,7 @@ class LocationProvider extends ChangeNotifier {
         'latitude': newLocation.latitude,
         'longitude': newLocation.longitude,
         'images': newLocation.images,
+        'longDescription': newLocation.longDescription,
         'category': newLocation.category,
         'createdAt': DateTime.now().toIso8601String(),
       });
@@ -104,6 +105,7 @@ class LocationProvider extends ChangeNotifier {
           latitude: (item['latitude'] as num?)?.toDouble() ?? 0.0,
           longitude: (item['longitude'] as num?)?.toDouble() ?? 0.0,
           description: item['description'] ?? '',
+          longDescription: item['longDescription'] ?? '',
           images: item['images'] != null
               ? List<String>.from(item['images'])
               : [],
@@ -123,6 +125,7 @@ class LocationProvider extends ChangeNotifier {
               latitude: (item['latitude'] as num?)?.toDouble() ?? 0.0,
               longitude: (item['longitude'] as num?)?.toDouble() ?? 0.0,
               description: item['description'] ?? '',
+              longDescription: item['longDescription'] ?? '',
               images: item['images'] != null
                   ? List<String>.from(item['images'])
                   : [],
@@ -167,6 +170,7 @@ class LocationProvider extends ChangeNotifier {
                           ) ??
                           0.0,
                       description: row['description'] ?? '',
+                      longDescription: row['longDescription'] ?? '',
                       images: row.containsKey('images') && row['images'] != null
                           ? List<String>.from(row['images'])
                           : (row.containsKey('imageUrl') &&
@@ -224,6 +228,7 @@ class LocationProvider extends ChangeNotifier {
               ? item['images'][0]
               : null,
           'images': item['images'] ?? [],
+          'longDescription': item['longDescription'] ?? '',
           'category': item['category'] ?? '',
           'createdAt': DateTime.now().toIso8601String(),
         });

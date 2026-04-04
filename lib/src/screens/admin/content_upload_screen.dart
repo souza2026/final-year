@@ -22,26 +22,36 @@ class ContentUploadScreen extends StatefulWidget {
 
 class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final _formKey = GlobalKey<FormBuilderState>();
-  XFile? _image;
+  final List<XFile> _images = [];
   bool _isLoading = false;
 
-  Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-    );
-    if (pickedFile != null) {
+  Future<void> _pickImages() async {
+    final pickedFiles = await ImagePicker().pickMultiImage();
+    if (pickedFiles.isNotEmpty) {
       const maxSizeInBytes = 5 * 1024 * 1024; // 5 MB
-      final imageSize = await pickedFile.length();
-      if (imageSize > maxSizeInBytes) {
-        _showErrorDialog(
-          'The selected image is too large. Please select an image under 5 MB.',
-        );
-        return;
+      final validImages = <XFile>[];
+      for (final file in pickedFiles) {
+        final size = await file.length();
+        if (size > maxSizeInBytes) {
+          if (mounted) {
+            _showErrorDialog(
+              'Image "${file.name}" is too large (over 5 MB) and was skipped.',
+            );
+          }
+        } else {
+          validImages.add(file);
+        }
       }
       setState(() {
-        _image = pickedFile;
+        _images.addAll(validImages);
       });
     }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _images.removeAt(index);
+    });
   }
 
   Future<String> _uploadImage(XFile image) async {
@@ -84,8 +94,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       return;
     }
 
-    if (_image == null) {
-      _showErrorDialog('Please select an image to upload.');
+    if (_images.isEmpty) {
+      _showErrorDialog('Please select at least one image to upload.');
       return;
     }
 
@@ -94,20 +104,25 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     });
 
     try {
-      final imageUrl = await _uploadImage(_image!);
+      final List<String> imageUrls = [];
+      for (final image in _images) {
+        final url = await _uploadImage(image);
+        imageUrls.add(url);
+      }
+
       final formData = formState.value;
 
       final newLocation = LocationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: formData['site_title'],
         description: formData['data_about_site'],
+        longDescription: formData['long_description'] ?? '',
         latitude: double.tryParse(formData['latitude'].toString()) ?? 15.2993,
         longitude: double.tryParse(formData['longitude'].toString()) ?? 73.9814,
-        images: [imageUrl],
+        images: imageUrls,
         category: formData['category'] ?? '',
       );
 
-      // Save to Supabase (via LocationProvider)
       if (mounted) {
         await context.read<LocationProvider>().addCustomLocation(newLocation);
         _showSuccessDialog();
@@ -137,8 +152,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
             TextButton(
               child: const Text('OK'),
               onPressed: () {
-                Navigator.of(context).pop(); // Dismiss the dialog
-                context.pop(); // Go back to the previous screen
+                Navigator.of(context).pop();
+                context.pop();
               },
             ),
           ],
@@ -224,12 +239,19 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                       const SizedBox(height: 16),
                       _buildTextField(
                         name: 'data_about_site',
-                        hint: 'Data About The Site.....',
-                        maxLines: 5,
+                        hint: 'Short Description',
+                        maxLines: 3,
                         validators: [
                           FormBuilderValidators.required(),
-                          FormBuilderValidators.maxLength(2000),
+                          FormBuilderValidators.maxLength(500),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        name: 'long_description',
+                        hint: 'Detailed History / Long Description',
+                        maxLines: 8,
+                        validators: [],
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -361,67 +383,113 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   }
 
   Widget _buildImagePicker() {
-    return Center(
-      child: GestureDetector(
-        onTap: _pickImage,
-        child: Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20.0),
-            border: Border.all(color: Colors.grey.shade300, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withAlpha(10),
-                spreadRadius: 2,
-                blurRadius: 5,
-                offset: const Offset(0, 3),
-              ),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_images.isNotEmpty)
+          SizedBox(
+            height: 110,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _images.length + 1,
+              itemBuilder: (context, index) {
+                if (index == _images.length) {
+                  return _buildAddImageButton();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: kIsWeb
+                              ? Image.network(_images[index].path,
+                                  fit: BoxFit.cover)
+                              : Image.file(File(_images[index].path),
+                                  fit: BoxFit.cover),
+                        ),
+                      ),
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: GestureDetector(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close,
+                                size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          )
+        else
+          Center(child: _buildAddImageButton()),
+        const SizedBox(height: 4),
+        Center(
+          child: Text(
+            '${_images.length} image${_images.length == 1 ? '' : 's'} selected (Max 5 MB each)',
+            style: GoogleFonts.inter(
+              color: Colors.grey.shade600,
+              fontSize: 11,
+            ),
           ),
-          child: _image != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(20.0),
-                  child: kIsWeb
-                      ? Image.network(_image!.path, fit: BoxFit.cover)
-                      : Image.file(File(_image!.path), fit: BoxFit.cover),
-                )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF004D40),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Upload Photo',
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFF004D40),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '(Max 5 MB)',
-                      style: GoogleFonts.inter(
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.normal,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAddImageButton() {
+    return GestureDetector(
+      onTap: _pickImages,
+      child: Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF004D40),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.add_photo_alternate,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Add Photos',
+              style: GoogleFonts.inter(
+                color: const Color(0xFF004D40),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -440,7 +508,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       keyboardType: keyboardType,
       maxLength: name == 'site_title'
           ? 150
-          : (name == 'data_about_site' ? 2000 : null),
+          : (name == 'data_about_site'
+              ? 500
+              : (name == 'long_description' ? 5000 : null)),
       validator: FormBuilderValidators.compose(validators ?? []),
       decoration: InputDecoration(
         hintText: hint,

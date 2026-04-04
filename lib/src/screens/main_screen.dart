@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:myapp/src/screens/map_screen.dart';
 import 'package:myapp/src/screens/history_screen.dart';
 import 'package:myapp/src/screens/ai_screen.dart';
@@ -29,12 +30,22 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-      bottomNavigationBar: _buildCustomBottomNavBar(),
-      extendBody:
-          true, // Allow content to go behind navbar if transparent, but here it's floating
+    return Consumer<ValueNotifier<int>>(
+      builder: (context, tabNotifier, child) {
+        if (tabNotifier.value != _selectedIndex) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            setState(() {
+              _selectedIndex = tabNotifier.value;
+            });
+          });
+        }
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
+          bottomNavigationBar: _buildCustomBottomNavBar(),
+          extendBody: true,
+        );
+      },
     );
   }
 
@@ -70,15 +81,17 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     bool isSelected = _selectedIndex == index;
-    // Colors from the prompt/image analysis
     final Color selectedColor = Colors.white;
-    final Color unselectedColor = const Color(0xFF005A60); // Teal text
-    final Color selectedBgColor = const Color(0xFF005A60); // Teal bg
-    final Color unselectedBgColor = const Color(0xFFE0F7FA); // Light Cyan bg
+    final Color unselectedColor = const Color(0xFF005A60);
+    final Color selectedBgColor = const Color(0xFF005A60);
+    final Color unselectedBgColor = const Color(0xFFE0F7FA);
 
     return Expanded(
       child: GestureDetector(
-        onTap: () => _onItemTapped(index),
+        onTap: () {
+          _onItemTapped(index);
+          context.read<ValueNotifier<int>>().value = index;
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.symmetric(horizontal: 4),

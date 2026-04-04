@@ -38,6 +38,7 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => MapStateProvider()),
+        ChangeNotifierProvider(create: (_) => ValueNotifier<int>(0)),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {

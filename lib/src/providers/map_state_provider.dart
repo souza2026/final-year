@@ -54,7 +54,7 @@ class MapStateProvider extends ChangeNotifier {
   bool _isDirectionPanelOpen = false;
 
   // Category filter
-  String _selectedCategory = 'all';
+  Set<String> _selectedCategories = {'all'};
 
   // Radius
   double _selectedRadius = 2.0; // km
@@ -80,7 +80,7 @@ class MapStateProvider extends ChangeNotifier {
   int get nearbyCount => _nearbyCount;
   bool get hasActiveRoute => _routePolyline.isNotEmpty;
   bool get isDirectionPanelOpen => _isDirectionPanelOpen;
-  String get selectedCategory => _selectedCategory;
+  Set<String> get selectedCategories => _selectedCategories;
   List<RouteStep> get routeSteps => List.unmodifiable(_routeSteps);
   bool get isNavigating => _isNavigating;
   int get currentStepIndex => _currentStepIndex;
@@ -272,16 +272,29 @@ class MapStateProvider extends ChangeNotifier {
 
   // ===================== CATEGORY FILTER =====================
 
-  void setCategory(String category) {
-    _selectedCategory = category;
+  void toggleCategory(String category) {
+    if (category == 'all') {
+      _selectedCategories = {'all'};
+    } else {
+      final updated = Set<String>.from(_selectedCategories);
+      updated.remove('all');
+      if (updated.contains(category)) {
+        updated.remove(category);
+      } else {
+        updated.add(category);
+      }
+      _selectedCategories = updated.isEmpty ? {'all'} : updated;
+    }
     notifyListeners();
   }
 
   List<LocationModel> filterLocations(List<LocationModel> locations) {
-    if (_selectedCategory == 'all' || _selectedCategory.isEmpty) {
+    if (_selectedCategories.contains('all')) {
       return locations;
     }
-    return locations.where((loc) => loc.category == _selectedCategory).toList();
+    return locations
+        .where((loc) => _selectedCategories.contains(loc.category))
+        .toList();
   }
 
   // ===================== NAVIGATION =====================

@@ -6,6 +6,7 @@ class LocationModel {
   final double latitude;
   final double longitude;
   final String description;
+  final String longDescription;
   final List<String> images;
   final String category;
 
@@ -15,6 +16,7 @@ class LocationModel {
     required this.latitude,
     required this.longitude,
     required this.description,
+    this.longDescription = '',
     required this.images,
     this.category = '',
   });
@@ -26,6 +28,7 @@ class LocationModel {
       latitude: map['latitude']?.toDouble() ?? 0.0,
       longitude: map['longitude']?.toDouble() ?? 0.0,
       description: map['description'] ?? '',
+      longDescription: map['longDescription'] ?? '',
       images: List<String>.from(map['images'] ?? []),
       category: map['category'] ?? '',
     );

@@ -18,7 +18,7 @@ class CategoryChipsWidget extends StatelessWidget {
               final key = chip['key'] as String;
               final label = chip['label'] as String;
               final icon = chip['icon'] as IconData;
-              final isSelected = mapState.selectedCategory == key;
+              final isSelected = mapState.selectedCategories.contains(key);
 
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -37,7 +37,7 @@ class CategoryChipsWidget extends StatelessWidget {
                     ),
                   ),
                   selected: isSelected,
-                  onSelected: (_) => mapState.setCategory(key),
+                  onSelected: (_) => mapState.toggleCategory(key),
                   selectedColor: const Color(0xFF005A60),
                   backgroundColor: Colors.white,
                   shape: RoundedRectangleBorder(

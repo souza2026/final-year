@@ -189,7 +189,29 @@ class _MapScreenState extends State<MapScreen> {
                       color: Colors.grey[800],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        context.read<ValueNotifier<int>>().value = 1;
+                      },
+                      icon: const Icon(Icons.history_edu, size: 18),
+                      label: Text(
+                        'View Details',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF005A60),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   if (location.images.isNotEmpty)
                     SizedBox(
                       height: 200,
