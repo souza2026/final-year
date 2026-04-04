@@ -54,7 +54,7 @@ class MapStateProvider extends ChangeNotifier {
   bool _isDirectionPanelOpen = false;
 
   // Category filter
-  Set<String> _selectedCategories = {'all'};
+  Set<String> _selectedCategories = {};
 
   // Radius
   double _selectedRadius = 2.0; // km
@@ -272,24 +272,26 @@ class MapStateProvider extends ChangeNotifier {
 
   // ===================== CATEGORY FILTER =====================
 
+  bool get isShowingAll => _selectedCategories.isEmpty;
+
   void toggleCategory(String category) {
-    if (category == 'all') {
-      _selectedCategories = {'all'};
+    final updated = Set<String>.from(_selectedCategories);
+    if (updated.contains(category)) {
+      updated.remove(category);
     } else {
-      final updated = Set<String>.from(_selectedCategories);
-      updated.remove('all');
-      if (updated.contains(category)) {
-        updated.remove(category);
-      } else {
-        updated.add(category);
-      }
-      _selectedCategories = updated.isEmpty ? {'all'} : updated;
+      updated.add(category);
     }
+    _selectedCategories = updated;
+    notifyListeners();
+  }
+
+  void clearCategories() {
+    _selectedCategories = {};
     notifyListeners();
   }
 
   List<LocationModel> filterLocations(List<LocationModel> locations) {
-    if (_selectedCategories.contains('all')) {
+    if (_selectedCategories.isEmpty) {
       return locations;
     }
     return locations
