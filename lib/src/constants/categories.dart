@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
 class LocationCategories {
-  static const String piazzaCrosses = 'piazza_crosses';
-  static const String christTheKing = 'christ_the_king';
-  static const String ourLadysGrotto = 'our_ladys_grotto';
-  static const String stoneInscriptions = 'stone_inscriptions';
-  static const String iconsOfHinduDeities = 'icons_of_hindu_deities';
-  static const String stoneAgeRockCarvings = 'stone_age_rock_carvings';
-  static const String fort = 'fort';
+  static const String piazzaCrosses = 'Piazza Crosses';
+  static const String christTheKing = 'Christ the King';
+  static const String ourLadysGrotto = "Our Lady's Grotto";
+  static const String stoneInscriptions = 'Ancient Stone Inscription';
+  static const String iconsOfHinduDeities = 'Icons of Hindu Deities';
+  static const String stoneAgeRockCarvings = 'Stone Age Rock Carvings';
+  static const String fort = 'Fort';
+  static const String churches = 'churches';
+  static const String beaches = 'beaches';
+  static const String museums = 'museums';
+  static const String heritage = 'heritage';
 
   /// Get the chip data for a category key, or null if not found.
   static Map<String, dynamic>? getChip(String key) {
@@ -90,6 +94,38 @@ class LocationCategories {
       'iconAsset': null,
       'description':
           'Strategic military bastions primarily constructed from indigenous laterite. These 16th and 17th-century fortifications were built by both colonial and local powers to guard river mouths, trade routes, and inland frontiers, serving as monumental reminders of Goa\'s defensive history.',
+    },
+    {
+      'key': churches,
+      'label': 'Churches',
+      'icon': Icons.church,
+      'iconAsset': null,
+      'description':
+          'Historic churches showcasing Goan-Portuguese ecclesiastical architecture, from grand Baroque facades to intimate village chapels.',
+    },
+    {
+      'key': beaches,
+      'label': 'Beaches',
+      'icon': Icons.beach_access,
+      'iconAsset': null,
+      'description':
+          'Scenic coastal stretches known for their white sands, swaying palms, and vibrant local culture.',
+    },
+    {
+      'key': museums,
+      'label': 'Museums',
+      'icon': Icons.museum,
+      'iconAsset': null,
+      'description':
+          'Cultural institutions preserving Goa\'s rich history through ethnographic collections, colonial artifacts, and traditional art.',
+    },
+    {
+      'key': heritage,
+      'label': 'Heritage',
+      'icon': Icons.account_balance,
+      'iconAsset': null,
+      'description':
+          'Grand ancestral mansions and historic residences that exemplify Indo-Portuguese architectural grandeur and aristocratic Goan life.',
     },
   ];
 }
