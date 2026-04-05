@@ -110,7 +110,7 @@ class MyApp extends StatelessWidget {
           final appRouter = router ?? AppRouter(authService).router;
 
           return MaterialApp.router(
-            title: 'Goa Maps',
+            title: 'Echoes in Stone',
             theme: lightTheme,        // Primary light theme
             darkTheme: darkTheme,     // Backup dark theme
             themeMode: themeProvider.themeMode, // Current mode from ThemeProvider

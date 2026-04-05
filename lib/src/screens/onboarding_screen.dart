@@ -251,7 +251,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                         // App name branding text.
                         Text(
-                          'GOA MAPS',
+                          'ECHOES IN STONE',
                           style: GoogleFonts.inter(
                             fontSize: 10,
                             letterSpacing: 1.5,

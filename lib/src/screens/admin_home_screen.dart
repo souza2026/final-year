@@ -51,7 +51,7 @@ class AdminHomeScreen extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                'Goa Maps',
+                'Echoes in Stone',
                 style: GoogleFonts.inter(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
