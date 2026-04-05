@@ -1,9 +1,26 @@
+// ============================================================
+// edit_content_screen.dart — Searchable list of locations for editing
+// ============================================================
+// This screen displays all locations stored in the database
+// as a scrollable, searchable list. The admin can type a
+// query in the search bar to filter locations by name and
+// tap on any location card to navigate to its detailed edit
+// screen ([DetailedEditScreen]). The screen consumes
+// [LocationProvider] via Provider to reactively display the
+// latest location data without manual refresh.
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/location_provider.dart';
+import '../../widgets/admin/admin_scaffold.dart';
+import '../../widgets/admin/admin_search_bar.dart';
+import '../../widgets/admin/admin_back_button.dart';
 
+/// Stateful widget because the search query is kept as local state
+/// and triggers a filtered rebuild of the location list.
 class EditContentScreen extends StatefulWidget {
   const EditContentScreen({super.key});
 
@@ -12,128 +29,68 @@ class EditContentScreen extends StatefulWidget {
 }
 
 class _EditContentScreenState extends State<EditContentScreen> {
+  /// The current search text entered by the admin.
+  /// Used to filter the list of locations by name (case-insensitive).
   String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
+    return AdminScaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/background_pattern.png'),
-                fit: BoxFit.cover,
-              ),
+          const SizedBox(height: 10),
+
+          // ---- Screen title ----
+          Text(
+            'Edit Content',
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              color: Colors.black,
             ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Edit Content',
-                        style: GoogleFonts.inter(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () async {
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (c) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-                          await context
-                              .read<LocationProvider>()
-                              .importJsonToDatabase();
-                          if (context.mounted) {
-                            Navigator.pop(context); // close dialog
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Successfully imported locations into the database!',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        icon: const Icon(
-                          Icons.cloud_upload,
-                          color: Color(0xFF004D40),
-                        ),
-                        tooltip: 'Import JSON to Database',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSearchBar(),
-                  const SizedBox(height: 24),
-                  Expanded(child: _buildContentList()),
-                  const SizedBox(height: 16),
-                  _buildBackButton(),
-                ],
-              ),
-            ),
+          const SizedBox(height: 24),
+
+          // ---- Search bar ----
+          // Calls setState on every keystroke to re-filter the list below.
+          AdminSearchBar(
+            hintText: 'Search Available Sites',
+            onChanged: (value) => setState(() => _searchQuery = value),
           ),
+          const SizedBox(height: 24),
+
+          // ---- Scrollable content list (expands to fill remaining space) ----
+          Expanded(child: _buildContentList()),
+          const SizedBox(height: 16),
+
+          // ---- Shared back button widget ----
+          const AdminBackButton(),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-            spreadRadius: 1,
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: TextField(
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
-        decoration: InputDecoration(
-          hintText: 'Search Available Sites',
-          hintStyle: GoogleFonts.inter(color: Colors.grey.shade500),
-          prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      ),
-    );
-  }
-
+  /// Builds the reactive list of location cards.
+  ///
+  /// Uses [Consumer] to listen for changes in [LocationProvider].
+  /// While the provider is still loading its initial data, a centered
+  /// spinner is shown. Once loaded, locations are filtered by the
+  /// current search query and displayed as tappable cards.
   Widget _buildContentList() {
     return Consumer<LocationProvider>(
       builder: (context, locationProvider, child) {
+        // Show a spinner while the initial load is still in progress
         if (locationProvider.isLoading && locationProvider.locations.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // Filter locations whose names contain the search query (case-insensitive)
         var docs = locationProvider.locations.where((loc) {
           return loc.name.toLowerCase().contains(_searchQuery.toLowerCase());
         }).toList();
 
+        // Empty state message when no results match
         if (docs.isEmpty) {
           return Center(
             child: Text(
@@ -143,31 +100,35 @@ class _EditContentScreenState extends State<EditContentScreen> {
           );
         }
 
+        // Render the list of site cards
         return ListView.builder(
           itemCount: docs.length,
           padding: EdgeInsets.zero,
           itemBuilder: (context, index) {
             final loc = docs[index];
-            final title = loc.name;
+            // Use the first image as a thumbnail, if available
             final imageUrl = loc.images.isNotEmpty ? loc.images.first : null;
-
-            return _buildSiteCard(title, imageUrl, loc.id);
+            return _buildSiteCard(loc.name, imageUrl, loc.id);
           },
         );
       },
     );
   }
 
+  /// Builds a single tappable site card showing a thumbnail and title.
+  ///
+  /// [title] — the location name.
+  /// [imageUrl] — URL for the thumbnail image (may be null).
+  /// [docId] — the location's unique document ID, used to navigate
+  ///   to the detailed edit screen for that specific location.
   Widget _buildSiteCard(String title, String? imageUrl, String docId) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
-      // Use InkWell for the tap effect on the whole container card
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            context.go('/admin/edit-content/$docId');
-          },
+          // Navigate to the detailed edit screen for this location
+          onTap: () => context.go('/admin/edit-content/$docId'),
           borderRadius: BorderRadius.circular(16.0),
           child: Container(
             padding: const EdgeInsets.all(12.0),
@@ -177,15 +138,15 @@ class _EditContentScreenState extends State<EditContentScreen> {
               border: Border.all(color: const Color(0xFFEEEEEE)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(10), // Ultra subtle shadow
+                  color: Colors.black.withAlpha(10),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
-                  spreadRadius: 0,
                 ),
               ],
             ),
             child: Row(
               children: [
+                // ---- Thumbnail area ----
                 Container(
                   width: 60,
                   height: 60,
@@ -199,6 +160,7 @@ class _EditContentScreenState extends State<EditContentScreen> {
                           child: Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
+                            // Fallback to a placeholder icon if the image fails to load
                             errorBuilder: (context, error, stackTrace) =>
                                 _buildThumbnailPlaceholder(),
                           ),
@@ -206,6 +168,8 @@ class _EditContentScreenState extends State<EditContentScreen> {
                       : _buildThumbnailPlaceholder(),
                 ),
                 const SizedBox(width: 16),
+
+                // ---- Title text ----
                 Expanded(
                   child: Text(
                     title,
@@ -224,6 +188,9 @@ class _EditContentScreenState extends State<EditContentScreen> {
     );
   }
 
+  /// Builds a small placeholder widget shown when no thumbnail image
+  /// is available or when the network image fails to load.
+  /// Displays a camera icon and the text "Site Thumbnail".
   Widget _buildThumbnailPlaceholder() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -240,28 +207,6 @@ class _EditContentScreenState extends State<EditContentScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildBackButton() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: ElevatedButton(
-        onPressed: () => context.pop(),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF004D40),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30.0),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-          elevation: 0,
-        ),
-        child: Text(
-          'Back',
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-      ),
     );
   }
 }

@@ -1,14 +1,36 @@
+// ============================================================
+// profile_screen.dart — User profile display with logout
+// ============================================================
+// This screen shows the authenticated user's profile information
+// fetched from the Supabase `users` table.  It displays:
+//
+//   - A circular avatar (photo or initial letter fallback).
+//   - The user's name and email.
+//   - A stats row showing role, membership date, and email status.
+//   - An "Account Details" card with a summary of profile fields.
+//   - An "Edit Profile" button that navigates to [EditProfileScreen].
+//   - A "Logout" button that signs the user out via [AuthService]
+//     and redirects to the onboarding screen using GoRouter.
+//
+// The profile data is loaded asynchronously with a [FutureBuilder].
+// After returning from the edit screen, [_loadProfile] is called
+// again so the UI reflects any changes the user made.
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:myapp/src/models/user_model.dart';
-import 'package:myapp/src/screens/edit_profile_screen.dart';
-import 'package:myapp/src/services/auth_service.dart';
-import 'package:myapp/src/theme/theme.dart';
+import 'package:goa_maps/src/models/user_model.dart';
+import 'package:goa_maps/src/screens/edit_profile_screen.dart';
+import 'package:goa_maps/src/services/auth_service.dart';
+import 'package:goa_maps/src/theme/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// [ProfileScreen] is a StatefulWidget because it manages an
+/// asynchronous [Future] for the profile data and needs to reload
+/// that future after the user edits their profile.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -16,15 +38,24 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
+/// Private state for [ProfileScreen].
+///
+/// Holds the profile data future and helper methods for navigation
+/// and building reusable UI tiles.
 class _ProfileScreenState extends State<ProfileScreen> {
+  /// Future that resolves to the user's profile row from the Supabase
+  /// `users` table (as a raw Map), or `null` if no row exists.
   late Future<Map<String, dynamic>?> _profileFuture;
 
+  /// Kicks off the initial profile fetch.
   @override
   void initState() {
     super.initState();
     _loadProfile();
   }
 
+  /// Fetches the authenticated user's profile from Supabase.
+  /// The result is stored in [_profileFuture] for the [FutureBuilder].
   void _loadProfile() {
     final authService = Provider.of<AuthService>(context, listen: false);
     final user = authService.currentUser;
@@ -37,6 +68,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Navigates to the [EditProfileScreen].  When the user pops back,
+  /// we reload the profile so any changes (name, photo) are reflected.
   void _navigateToEditProfile() {
     Navigator.push(
       context,
@@ -50,6 +83,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  /// Builds the profile screen: app bar, avatar, stats, account details
+  /// card, and action buttons (edit / logout).
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
@@ -61,17 +96,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         automaticallyImplyLeading: false,
       ),
       body: user == null
+          // Show a spinner if there is no authenticated user yet
+          // (should rarely happen since the router guards this screen).
           ? const Center(child: CircularProgressIndicator())
           : FutureBuilder<Map<String, dynamic>?>(
               future: _profileFuture,
               builder: (context, snapshot) {
+                // Show a spinner while the Supabase query is in flight.
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                // Display an error message if the query failed.
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
 
+                // Build a UserModel from the database row, or create a
+                // sensible default if the row doesn't exist yet.
                 final userModel = snapshot.data != null
                     ? UserModel.fromMap(snapshot.data!)
                     : UserModel(
@@ -87,7 +128,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       const SizedBox(height: 24),
-                      // Avatar with edit badge
+
+                      // ---- Avatar with edit badge ----
+                      // Shows the user's profile photo if available,
+                      // otherwise shows the first letter of their username.
+                      // A small pencil icon in the bottom-right corner
+                      // opens the edit profile screen.
                       Stack(
                         children: [
                           CircleAvatar(
@@ -109,6 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   )
                                 : null,
                           ),
+                          // Edit badge positioned at the bottom-right of the avatar.
                           Positioned(
                             bottom: 0,
                             right: 0,
@@ -131,7 +178,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // Username
+
+                      // ---- Username ----
                       Text(
                         userModel.username.isNotEmpty
                             ? userModel.username
@@ -143,7 +191,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      // Email
+
+                      // ---- Email ----
                       Text(
                         userModel.email,
                         style: GoogleFonts.inter(
@@ -152,7 +201,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // Stats row
+
+                      // ---- Stats row ----
+                      // Three compact tiles showing Role, Member Since,
+                      // and Email verification status, separated by
+                      // vertical dividers.
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Row(
@@ -164,6 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               value: userModel.role[0].toUpperCase() +
                                   userModel.role.substring(1),
                             ),
+                            // Vertical divider between stats.
                             Container(
                               width: 1,
                               height: 40,
@@ -175,6 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               value: DateFormat('MMM yyyy')
                                   .format(userModel.createdAt),
                             ),
+                            // Vertical divider between stats.
                             Container(
                               width: 1,
                               height: 40,
@@ -189,7 +244,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-                      // Account Details card
+
+                      // ---- Account Details card ----
+                      // A teal-tinted card listing the user's key profile
+                      // fields: username, email, role, and join date.
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Container(
@@ -202,6 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Card heading.
                               Text(
                                 'Account Details',
                                 style: GoogleFonts.inter(
@@ -211,6 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                               const SizedBox(height: 16),
+                              // Individual detail rows with icon + label + value.
                               _buildDetailRow(
                                 Icons.person_outline,
                                 'Username',
@@ -241,11 +301,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-                      // Action buttons
+
+                      // ---- Action buttons ----
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Column(
                           children: [
+                            // "Edit Profile" button — navigates to edit screen.
                             SizedBox(
                               width: double.infinity,
                               height: 52,
@@ -269,6 +331,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
+
+                            // "Logout" button — signs out and redirects to
+                            // the onboarding / root route.
                             SizedBox(
                               width: double.infinity,
                               height: 52,
@@ -299,6 +364,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                       ),
+
+                      // Bottom padding to prevent content from being hidden
+                      // behind the floating bottom nav bar.
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -308,6 +376,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Builds a compact info tile used in the stats row.
+  ///
+  /// Displays an [icon] at the top, a bold [value] in the middle,
+  /// and a muted [label] at the bottom.
   Widget _buildInfoTile({
     required IconData icon,
     required String label,
@@ -337,6 +409,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Builds a single row inside the Account Details card.
+  ///
+  /// Each row shows an [icon], a muted [label] (e.g. "Username:"),
+  /// and the corresponding [value] (e.g. "Reuben").  The value text
+  /// is set to ellipsis overflow in case of long strings.
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Row(
       children: [

@@ -1,3 +1,15 @@
+// ============================================================
+// location_card.dart — Location card for list views
+// ============================================================
+// A compact card widget representing a single location in a
+// scrollable list (e.g., the nearby-locations list or search
+// results). It shows a thumbnail image (or a placeholder
+// icon), the location name, its category badge, a short
+// description, and a chevron indicating it is tappable.
+// Tapping the card triggers the [onTap] callback which
+// typically opens the location detail bottom sheet.
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,8 +17,16 @@ import 'dart:io';
 import '../models/location_model.dart';
 import '../constants/categories.dart';
 
+// A stateless card widget for displaying a location summary.
+///
+/// It receives a [LocationModel] and an [onTap] callback.
+/// The image loading logic handles both HTTP URLs (via
+/// [CachedNetworkImage]) and local file paths (via [Image.file]).
 class LocationCard extends StatelessWidget {
+  /// The location data model containing name, images, category, etc.
   final LocationModel location;
+
+  /// Callback invoked when the user taps the card.
   final VoidCallback onTap;
 
   const LocationCard({
@@ -36,6 +56,8 @@ class LocationCard extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // ---- Thumbnail image ----
+            // 80x80 container with a teal background fallback.
             Container(
               width: 80,
               height: 80,
@@ -48,6 +70,8 @@ class LocationCard extends StatelessWidget {
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(16),
                       child: location.images.first.startsWith('http')
+                          // Remote image — use CachedNetworkImage for
+                          // disk caching and placeholder support
                           ? CachedNetworkImage(
                               imageUrl: location.images.first,
                               fit: BoxFit.cover,
@@ -60,6 +84,8 @@ class LocationCard extends StatelessWidget {
                                 child: Icon(Icons.error, color: Colors.white),
                               ),
                             )
+                          // Local file path — used when image hasn't been
+                          // uploaded yet or is from a local asset
                           : Image.file(
                               File(location.images.first),
                               fit: BoxFit.cover,
@@ -69,6 +95,7 @@ class LocationCard extends StatelessWidget {
                               ),
                             ),
                     )
+                  // No image available — show a camera icon placeholder
                   : const Center(
                       child: Icon(
                         Icons.camera_alt_outlined,
@@ -78,10 +105,13 @@ class LocationCard extends StatelessWidget {
                     ),
             ),
             const SizedBox(width: 16),
+
+            // ---- Text content (name, category badge, description) ----
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Location name
                   Text(
                     location.name,
                     style: const TextStyle(
@@ -90,6 +120,7 @@ class LocationCard extends StatelessWidget {
                       color: Colors.black,
                     ),
                   ),
+                  // Category badge (only shown if category is set)
                   if (location.category.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Container(
@@ -109,6 +140,7 @@ class LocationCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  // Short description (max 2 lines with ellipsis)
                   if (location.description.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -124,6 +156,8 @@ class LocationCard extends StatelessWidget {
                 ],
               ),
             ),
+
+            // ---- Chevron icon indicating the card is tappable ----
             const Icon(
               Icons.chevron_right,
               color: Color(0xFF005A60),

@@ -1,3 +1,19 @@
+// ============================================================
+// content_upload_screen.dart — Form to add new locations with image upload
+// ============================================================
+// This screen provides a comprehensive form that allows admin
+// users to create a new location (point of interest) in the
+// Goa Maps database. The form includes fields for site title,
+// short description, long description, travel directions
+// ("How to Get There"), points of interest ("What to Look
+// For"), latitude/longitude coordinates (validated against
+// Goa's bounding box), category selection, and multi-image
+// upload. Images are validated for a 5 MB maximum size and
+// uploaded via [ImageUploadService]. Upon successful
+// submission the new location is persisted through the
+// [LocationProvider].
+// ============================================================
+
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -12,6 +28,9 @@ import '../../providers/location_provider.dart';
 import '../../models/location_model.dart';
 import '../../constants/categories.dart';
 
+/// Stateful widget for the content upload form.
+/// State is needed because the form tracks picked images and
+/// a loading flag while the upload is in progress.
 class ContentUploadScreen extends StatefulWidget {
   const ContentUploadScreen({super.key});
 
@@ -20,18 +39,31 @@ class ContentUploadScreen extends StatefulWidget {
 }
 
 class _ContentUploadScreenState extends State<ContentUploadScreen> {
+  /// Global key for the [FormBuilder] widget, used to save and validate
+  /// all form fields at once before submission.
   final _formKey = GlobalKey<FormBuilderState>();
+
+  /// List of images selected by the admin via the device's image picker.
+  /// These are [XFile] instances that can represent files on both mobile
+  /// (via file path) and web (via blob URL).
   final List<XFile> _images = [];
+
+  /// Flag that prevents double-submission and shows a loading spinner
+  /// on the submit button while the upload is in progress.
   bool _isLoading = false;
 
+  /// Opens the device image picker in multi-select mode.
+  /// Each selected image is validated against a 5 MB size limit.
+  /// Images exceeding the limit are skipped and an error dialog is shown.
   Future<void> _pickImages() async {
     final pickedFiles = await ImagePicker().pickMultiImage();
     if (pickedFiles.isNotEmpty) {
-      const maxSizeInBytes = 5 * 1024 * 1024; // 5 MB
+      const maxSizeInBytes = 5 * 1024 * 1024; // 5 MB limit per image
       final validImages = <XFile>[];
       for (final file in pickedFiles) {
         final size = await file.length();
         if (size > maxSizeInBytes) {
+          // Notify the admin that this particular image was too large
           if (mounted) {
             _showErrorDialog(
               'Image "${file.name}" is too large (over 5 MB) and was skipped.',
@@ -41,21 +73,28 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           validImages.add(file);
         }
       }
+      // Append the valid images to the existing list (allows adding more later)
       setState(() {
         _images.addAll(validImages);
       });
     }
   }
 
+  /// Removes a previously selected image at [index] from the list.
   void _removeImage(int index) {
     setState(() {
       _images.removeAt(index);
     });
   }
 
+  /// Uploads a single [XFile] image using the shared [ImageUploadService]
+  /// and returns the resulting remote URL.
   Future<String> _uploadImage(XFile image) => ImageUploadService.uploadXFile(image);
 
+  /// Validates the form, uploads all images, constructs a [LocationModel],
+  /// and adds it to the database via [LocationProvider.addCustomLocation].
   Future<void> _submit() async {
+    // Guard against double-tap while already submitting
     if (_isLoading) return;
 
     final formState = _formKey.currentState;
@@ -63,11 +102,13 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       return;
     }
 
+    // Validate all fields; if invalid, log errors for debugging
     if (!formState.saveAndValidate()) {
       _debugErrors(formState);
       return;
     }
 
+    // At least one image is required for a location entry
     if (_images.isEmpty) {
       _showErrorDialog('Please select at least one image to upload.');
       return;
@@ -78,14 +119,17 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     });
 
     try {
+      // Upload each image sequentially and collect the remote URLs
       final List<String> imageUrls = [];
       for (final image in _images) {
         final url = await _uploadImage(image);
         imageUrls.add(url);
       }
 
+      // Extract validated form values
       final formData = formState.value;
 
+      // Build a new LocationModel with a timestamp-based unique ID
       final newLocation = LocationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: formData['site_title'],
@@ -99,6 +143,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         whatTo: formData['what_to'] ?? '',
       );
 
+      // Persist the new location through the provider (writes to Supabase)
       if (mounted) {
         await context.read<LocationProvider>().addCustomLocation(newLocation);
         _showSuccessDialog();
@@ -108,6 +153,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         _showErrorDialog('An unexpected error occurred: $e');
       }
     } finally {
+      // Always reset the loading flag, even if an error occurred
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -116,6 +162,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     }
   }
 
+  /// Shows a success dialog after content is uploaded.
+  /// Dismissing the dialog also pops the screen back to the admin home.
   void _showSuccessDialog() {
     showDialog(
       context: context,
@@ -128,8 +176,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
             TextButton(
               child: const Text('OK'),
               onPressed: () {
-                Navigator.of(context).pop();
-                context.pop();
+                Navigator.of(context).pop(); // Close the dialog
+                context.pop(); // Navigate back to admin home
               },
             ),
           ],
@@ -138,6 +186,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     );
   }
 
+  /// Shows an error dialog with a custom [message].
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -158,6 +207,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     );
   }
 
+  /// Iterates through all form fields and prints any validation errors
+  /// to the debug console. Useful during development to diagnose why
+  /// a form fails validation.
   void _debugErrors(FormBuilderState form) {
     debugPrint('FORM ERRORS:');
     form.fields.forEach((key, field) {
@@ -182,6 +234,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       ),
       body: Stack(
         children: [
+          // ---- Background pattern (decorative) ----
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -191,19 +244,26 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
               ),
             ),
           ),
+
+          // ---- Scrollable form content ----
           SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Center(
               child: Container(
+                // Constrain width for larger screens / tablets
                 constraints: const BoxConstraints(maxWidth: 500),
                 child: FormBuilder(
                   key: _formKey,
+                  // Validate on every keystroke once user has interacted
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Image picker section (thumbnails + add button)
                       _buildImagePicker(),
                       const SizedBox(height: 24),
+
+                      // Site title field (required, max 150 chars)
                       _buildTextField(
                         name: 'site_title',
                         hint: 'Site Title',
@@ -213,6 +273,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // Short description (required, max 500 chars)
                       _buildTextField(
                         name: 'data_about_site',
                         hint: 'Short Description',
@@ -223,6 +285,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // Long description (optional, max 5000 chars)
                       _buildTextField(
                         name: 'long_description',
                         hint: 'Detailed History / Long Description',
@@ -230,6 +294,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                         validators: [],
                       ),
                       const SizedBox(height: 16),
+
+                      // How-to-get-there field (optional)
                       _buildTextField(
                         name: 'how_to',
                         hint: 'How to Get There',
@@ -237,6 +303,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                         validators: [],
                       ),
                       const SizedBox(height: 16),
+
+                      // What-to-look-for field (optional)
                       _buildTextField(
                         name: 'what_to',
                         hint: 'What to Look For',
@@ -244,6 +312,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                         validators: [],
                       ),
                       const SizedBox(height: 16),
+
+                      // ---- Latitude / Longitude side-by-side ----
+                      // Both are required and validated to be within Goa's
+                      // approximate geographic bounding box.
                       Row(
                         children: [
                           Expanded(
@@ -253,6 +325,14 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                               validators: [
                                 FormBuilderValidators.required(),
                                 FormBuilderValidators.numeric(),
+                                // Custom validator: ensure within Goa's latitude range
+                                (value) {
+                                  final num = double.tryParse(value ?? '');
+                                  if (num != null && (num < 14.5 || num > 16.0)) {
+                                    return 'Must be 14.5–16.0 (Goa)';
+                                  }
+                                  return null;
+                                },
                               ],
                               keyboardType:
                                   const TextInputType.numberWithOptions(
@@ -268,6 +348,14 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                               validators: [
                                 FormBuilderValidators.required(),
                                 FormBuilderValidators.numeric(),
+                                // Custom validator: ensure within Goa's longitude range
+                                (value) {
+                                  final num = double.tryParse(value ?? '');
+                                  if (num != null && (num < 73.0 || num > 74.5)) {
+                                    return 'Must be 73.0–74.5 (Goa)';
+                                  }
+                                  return null;
+                                },
                               ],
                               keyboardType:
                                   const TextInputType.numberWithOptions(
@@ -278,6 +366,11 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // ---- Category dropdown ----
+                      // Uses the shared [LocationCategories] constants to
+                      // populate the dropdown. The 'all' pseudo-category is
+                      // excluded because it is only used for filtering.
                       FormBuilderDropdown<String>(
                         name: 'category',
                         decoration: InputDecoration(
@@ -322,6 +415,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                             .toList(),
                       ),
                       const SizedBox(height: 32),
+
+                      // ---- Submit button ----
+                      // Disabled while loading; shows a spinner instead of text.
                       ElevatedButton(
                         onPressed: _isLoading ? null : _submit,
                         style: ElevatedButton.styleFrom(
@@ -350,6 +446,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                               ),
                       ),
                       const SizedBox(height: 16),
+
+                      // ---- Back button ----
+                      // Pops the current route to return to admin home.
                       TextButton(
                         onPressed: () => context.pop(),
                         child: Text(
@@ -372,6 +471,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     );
   }
 
+  /// Builds the image picker section.
+  /// If images have already been picked, it shows a horizontal scrollable
+  /// list of thumbnails with remove buttons plus an "Add Photos" tile at the
+  /// end. If no images are selected yet, only the add button is shown.
   Widget _buildImagePicker() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,11 +484,13 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
             height: 110,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: _images.length + 1,
+              itemCount: _images.length + 1, // +1 for the add-more button
               itemBuilder: (context, index) {
+                // Last item in the list is the "Add Photos" button
                 if (index == _images.length) {
                   return _buildAddImageButton();
                 }
+                // Render a thumbnail of the picked image with a red X overlay
                 return Padding(
                   padding: const EdgeInsets.only(right: 10),
                   child: Stack(
@@ -399,6 +504,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
+                          // On web, use Image.network; on mobile, use Image.file
                           child: kIsWeb
                               ? Image.network(_images[index].path,
                                   fit: BoxFit.cover)
@@ -406,6 +512,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                                   fit: BoxFit.cover),
                         ),
                       ),
+                      // Red circle X button to remove the image
                       Positioned(
                         top: 2,
                         right: 2,
@@ -429,8 +536,12 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
             ),
           )
         else
+          // No images selected yet — show a centered add button
           Center(child: _buildAddImageButton()),
+
         const SizedBox(height: 4),
+
+        // Label showing how many images are currently selected
         Center(
           child: Text(
             '${_images.length} image${_images.length == 1 ? '' : 's'} selected (Max 5 MB each)',
@@ -444,6 +555,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     );
   }
 
+  /// Builds the tappable "Add Photos" button tile used in the image picker.
+  /// Shows a camera icon inside a teal container with a label beneath it.
   Widget _buildAddImageButton() {
     return GestureDetector(
       onTap: _pickImages,
@@ -485,6 +598,16 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     );
   }
 
+  /// Generic reusable form text field builder.
+  ///
+  /// [name] — the FormBuilder field name (used as the key in form data).
+  /// [hint] — placeholder text shown when the field is empty.
+  /// [maxLines] — number of visible lines (default 1, increase for textareas).
+  /// [validators] — list of validator functions composed together.
+  /// [keyboardType] — optional keyboard type (e.g., numeric for coordinates).
+  ///
+  /// The `maxLength` counter text is hidden (`counterText: ''`) so the
+  /// character limit enforces silently without a visible counter.
   Widget _buildTextField({
     required String name,
     required String hint,
@@ -496,6 +619,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       name: name,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      // Determine the max character length based on the field name
       maxLength: name == 'site_title'
           ? 150
           : (name == 'data_about_site'
@@ -524,7 +648,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           borderRadius: BorderRadius.circular(20.0),
           borderSide: const BorderSide(color: Color(0xFF004D40), width: 2.0),
         ),
-        counterText: '',
+        counterText: '', // Hide the character counter
       ),
     );
   }

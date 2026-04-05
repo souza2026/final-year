@@ -1,6 +1,6 @@
 {
-    "name": "myapp",
-    "short_name": "myapp",
+    "name": "Goa Maps",
+    "short_name": "Goa Maps",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

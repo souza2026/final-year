@@ -1,3 +1,22 @@
+// ============================================================
+// history_screen.dart — Searchable card list of cultural locations
+// ============================================================
+// This screen displays all locations fetched from Supabase as a
+// scrollable list of cards.  A search bar at the top lets the user
+// filter by location name in real time.
+//
+// Tapping a card opens a draggable bottom sheet with full details:
+// images, long description, "How to Get There", "What to Look For",
+// and action buttons for getting directions or adding a stop on the
+// map.
+//
+// The screen also listens to a [ValueNotifier<LocationModel?>]
+// provided higher in the widget tree.  When another screen (e.g.
+// MapScreen) sets a location on that notifier and switches to the
+// History tab, this screen automatically opens the detail sheet for
+// that location — enabling a seamless "Know More" flow.
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +27,9 @@ import '../models/location_model.dart';
 import '../widgets/location_detail_sheet.dart';
 import '../widgets/location_card.dart';
 
+/// [HistoryScreen] is a StatefulWidget because it manages a search
+/// query string and listens to an external [ValueNotifier] for
+/// cross-tab deep-linking into location details.
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -15,42 +37,74 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
+/// Private state for [HistoryScreen].
+///
+/// Handles the search filter, the "selected location" listener for
+/// cross-tab navigation, and the location detail bottom sheet.
 class _HistoryScreenState extends State<HistoryScreen> {
+  /// The current text entered in the search bar.  Used to filter the
+  /// list of locations by name (case-insensitive).
   String _searchQuery = '';
+
+  /// Reference to the app-level [ValueNotifier] that carries a
+  /// pre-selected location from another tab (e.g. MapScreen).
+  /// When its value is non-null we automatically open the detail sheet.
   ValueNotifier<LocationModel?>? _selectedLocationNotifier;
 
+  /// Registers a listener on the [ValueNotifier<LocationModel?>] after
+  /// the first frame, so we can react when another screen selects a
+  /// location to view in detail.
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _selectedLocationNotifier = context.read<ValueNotifier<LocationModel?>>();
       _selectedLocationNotifier!.addListener(_onSelectedLocationChanged);
+      // Check immediately in case a location was already set before
+      // this screen was built (e.g. during initial navigation).
       _checkForSelectedLocation();
     });
   }
 
+  /// Called whenever the external selected-location notifier changes.
   void _onSelectedLocationChanged() {
     _checkForSelectedLocation();
   }
 
+  /// If a location has been set on the notifier (by another screen),
+  /// consume it (set to null) and open its detail sheet.
   void _checkForSelectedLocation() {
     final location = _selectedLocationNotifier?.value;
     if (location != null) {
+      // Reset the notifier so the sheet doesn't re-open on subsequent
+      // rebuilds or listener fires.
       _selectedLocationNotifier!.value = null;
       _showLocationDetail(context, location);
     }
   }
 
+  /// Removes the listener to prevent memory leaks.
   @override
   void dispose() {
     _selectedLocationNotifier?.removeListener(_onSelectedLocationChanged);
     super.dispose();
   }
 
+  /// Opens a draggable bottom sheet showing full details for [location].
+  ///
+  /// The sheet includes:
+  ///   - Drag handle
+  ///   - Location name and category badge
+  ///   - Image gallery
+  ///   - Long description (falls back to short description)
+  ///   - "How to Get There" section (if available)
+  ///   - "What to Look For" section (if available)
+  ///   - Direction / waypoint action buttons
   void _showLocationDetail(BuildContext context, LocationModel location) {
     final locationProvider = context.read<LocationProvider>();
     final currentLocation = locationProvider.currentLocation;
 
+    // Compute the straight-line distance from the user to this location.
     final distanceText = computeDistanceText(
       userLat: currentLocation?.latitude,
       userLng: currentLocation?.longitude,
@@ -63,6 +117,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
+        // A DraggableScrollableSheet lets the user swipe the sheet
+        // between 40% and 95% of the screen height.
         return DraggableScrollableSheet(
           initialChildSize: 0.75,
           minChildSize: 0.4,
@@ -77,7 +133,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 controller: controller,
                 padding: const EdgeInsets.all(20),
                 children: [
-                  // Drag handle
+                  // Drag handle — a small grey pill at the top of the sheet.
                   Center(
                     child: Container(
                       width: 40,
@@ -89,7 +145,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                   ),
-                  // Title
+
+                  // Location title.
                   Text(
                     location.name,
                     style: GoogleFonts.oswald(
@@ -98,7 +155,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       color: const Color(0xFF005A60),
                     ),
                   ),
-                  // Category badge
+
+                  // Category badge (e.g. "Temple", "Fort").
                   if (location.category.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Align(
@@ -106,7 +164,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       child: LocationCategoryBadge(category: location.category),
                     ),
                   ],
-                  // Images
+
+                  // Image gallery (horizontally scrollable).
                   if (location.images.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     LocationImageGallery(
@@ -115,7 +174,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       multiImageWidth: 300,
                     ),
                   ],
-                  // Description
+
+                  // Description section — prefers the long description if
+                  // available, otherwise falls back to the short one.
                   const SizedBox(height: 20),
                   Text(
                     'Description',
@@ -136,7 +197,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       height: 1.6,
                     ),
                   ),
-                  // How to Get There
+
+                  // "How to Get There" section — only shown when content exists.
                   if (location.howTo.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     Text(
@@ -157,7 +219,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                   ],
-                  // What to Look For
+
+                  // "What to Look For" section — only shown when content exists.
                   if (location.whatTo.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     Text(
@@ -178,7 +241,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                   ],
-                  // Buttons
+
+                  // Action buttons: "Get Directions" and "Add Stop".
                   const SizedBox(height: 24),
                   Builder(
                     builder: (ctx) {
@@ -187,6 +251,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       return LocationActionButtons(
                         distanceText: distanceText,
                         canAddStop: canAddStop,
+                        // "Get Directions" — calculates a route from the
+                        // user to this location and switches to the Maps tab.
                         onGetDirections: () {
                           if (currentLocation != null &&
                               currentLocation.latitude != null &&
@@ -197,10 +263,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             );
                             final destination = LatLng(location.latitude, location.longitude);
                             Navigator.pop(context);
+                            // Switch to the Maps tab (index 0).
                             context.read<ValueNotifier<int>>().value = 0;
                             mapState.selectDestination(origin, destination, location.name);
                           }
                         },
+                        // "Add Stop" — adds this location as a waypoint
+                        // to an existing route and switches to the Maps tab.
                         onAddStop: () {
                           if (currentLocation != null &&
                               currentLocation.latitude != null &&
@@ -211,6 +280,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             );
                             final point = LatLng(location.latitude, location.longitude);
                             Navigator.pop(context);
+                            // Switch to the Maps tab (index 0).
                             context.read<ValueNotifier<int>>().value = 0;
                             mapState.addWaypoint(origin, point, location.name);
                           }
@@ -218,6 +288,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       );
                     },
                   ),
+
+                  // Extra bottom padding so content isn't hidden behind
+                  // the system navigation bar or floating elements.
                   const SizedBox(height: 40),
                 ],
               ),
@@ -228,6 +301,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  /// Builds the History screen UI: a search bar on top and a filtered
+  /// list of [LocationCard] widgets below.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -237,7 +312,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Column(
             children: [
-              // Search Bar
+              // ---- Search Bar ----
+              // A rounded text field that filters the location list in
+              // real time as the user types.
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
@@ -279,21 +356,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ),
 
-              // List of Sites
+              // ---- List of location cards ----
               Expanded(
                 child: Consumer<LocationProvider>(
                   builder: (context, locationProvider, child) {
+                    // Show a spinner while the initial data load is in progress.
                     if (locationProvider.isLoading &&
                         locationProvider.locations.isEmpty) {
                       return const Center(child: CircularProgressIndicator());
                     }
 
+                    // Filter locations whose name contains the search query
+                    // (case-insensitive comparison).
                     var docs = locationProvider.locations.where((loc) {
                       return loc.name.toLowerCase().contains(
                             _searchQuery.toLowerCase(),
                           );
                     }).toList();
 
+                    // Empty state message when no locations match the query.
                     if (docs.isEmpty) {
                       return Center(
                         child: Text(
@@ -303,6 +384,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       );
                     }
 
+                    // Build a scrollable list of location cards.
                     return ListView.builder(
                       itemCount: docs.length,
                       itemBuilder: (context, index) {

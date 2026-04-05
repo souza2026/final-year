@@ -1,9 +1,30 @@
+// ============================================================
+// category_chips_widget.dart — Category filter chips for the map
+// ============================================================
+// Provides a horizontally scrollable row of category filter
+// chips displayed above the map. Users can tap individual
+// chips to toggle categories on/off, which filters the
+// visible map markers. A "Filter" button opens an overlay
+// dropdown with checkboxes and descriptions for a richer
+// filtering experience.
+//
+// The widget reads and writes to [MapStateProvider] to keep
+// the selected-categories state in sync across the app.
+//
+// Internal widgets:
+//  - [_FilterDropdownContent] — the overlay dropdown container.
+//  - [_FilterCategoryRow] — a single row inside the dropdown
+//    with a checkbox, icon, label, and info tooltip.
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../constants/categories.dart';
 import '../../providers/map_state_provider.dart';
 
+/// Stateful widget because it manages an [OverlayEntry] for the
+/// filter dropdown and tracks whether the dropdown is open.
 class CategoryChipsWidget extends StatefulWidget {
   const CategoryChipsWidget({super.key});
 
@@ -12,16 +33,24 @@ class CategoryChipsWidget extends StatefulWidget {
 }
 
 class _CategoryChipsWidgetState extends State<CategoryChipsWidget> {
+  /// Link used by [CompositedTransformTarget] / [CompositedTransformFollower]
+  /// to position the dropdown directly beneath the chip row.
   final LayerLink _layerLink = LayerLink();
+
+  /// The currently active overlay entry, or null if the dropdown is closed.
   OverlayEntry? _overlayEntry;
+
+  /// Whether the filter dropdown is currently visible.
   bool _isFilterOpen = false;
 
   @override
   void dispose() {
+    // Ensure the overlay is removed when the widget is disposed
     _removeOverlay();
     super.dispose();
   }
 
+  /// Toggles the filter dropdown open or closed.
   void _toggleFilterDropdown() {
     if (_isFilterOpen) {
       _removeOverlay();
@@ -30,12 +59,14 @@ class _CategoryChipsWidgetState extends State<CategoryChipsWidget> {
     }
   }
 
+  /// Creates and inserts the overlay entry into the [Overlay].
   void _showOverlay() {
     _overlayEntry = _createOverlayEntry();
     Overlay.of(context).insert(_overlayEntry!);
     setState(() => _isFilterOpen = true);
   }
 
+  /// Removes the overlay from the widget tree and resets state.
   void _removeOverlay() {
     _overlayEntry?.remove();
     _overlayEntry = null;
@@ -44,6 +75,10 @@ class _CategoryChipsWidgetState extends State<CategoryChipsWidget> {
     }
   }
 
+  /// Builds the [OverlayEntry] that contains:
+  ///  1. A full-screen transparent gesture detector to dismiss the dropdown.
+  ///  2. The [_FilterDropdownContent] positioned below the chip row using
+  ///     [CompositedTransformFollower].
   OverlayEntry _createOverlayEntry() {
     final renderBox = context.findRenderObject() as RenderBox;
     final size = renderBox.size;
@@ -51,7 +86,7 @@ class _CategoryChipsWidgetState extends State<CategoryChipsWidget> {
     return OverlayEntry(
       builder: (context) => Stack(
         children: [
-          // Tap-to-dismiss barrier
+          // Tap-to-dismiss barrier (catches taps outside the dropdown)
           GestureDetector(
             onTap: _removeOverlay,
             behavior: HitTestBehavior.opaque,
@@ -73,6 +108,12 @@ class _CategoryChipsWidgetState extends State<CategoryChipsWidget> {
     );
   }
 
+  /// Builds the icon for a category chip, choosing between a custom
+  /// asset image (if available) and a standard [IconData].
+  ///
+  /// [chip] — the category map from [LocationCategories.chips].
+  /// [isSelected] — determines the icon colour (white when selected,
+  /// teal when not).
   Widget _buildCategoryIcon(Map<String, dynamic> chip, bool isSelected) {
     final iconAsset = chip['iconAsset'] as String?;
     final color = isSelected ? Colors.white : const Color(0xFF005A60);
@@ -99,7 +140,8 @@ class _CategoryChipsWidgetState extends State<CategoryChipsWidget> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                // Filter button
+                // ---- "Filter" toggle button ----
+                // Opens/closes the filter dropdown overlay.
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: GestureDetector(
@@ -155,7 +197,9 @@ class _CategoryChipsWidgetState extends State<CategoryChipsWidget> {
                     ),
                   ),
                 ),
-                // Category chips
+
+                // ---- Individual category chips ----
+                // Each chip toggles its category in [MapStateProvider].
                 ...LocationCategories.chips.map((chip) {
                   final key = chip['key'] as String;
                   final label = chip['label'] as String;
@@ -221,11 +265,18 @@ class _CategoryChipsWidgetState extends State<CategoryChipsWidget> {
   }
 }
 
+/// The dropdown content that appears as an overlay beneath the
+/// category chip row. Displays a scrollable list of all categories
+/// with checkboxes, icons, labels, and optional info tooltips.
 class _FilterDropdownContent extends StatelessWidget {
+  /// Callback to close/remove the overlay.
   final VoidCallback onClose;
 
   const _FilterDropdownContent({required this.onClose});
 
+  /// Builds the icon widget for a category in the dropdown list.
+  /// Always uses the teal colour since items are not "selected" visually
+  /// here — the checkbox handles the selected state.
   Widget _buildCategoryIcon(Map<String, dynamic> chip) {
     final iconAsset = chip['iconAsset'] as String?;
     const color = Color(0xFF005A60);
@@ -272,8 +323,16 @@ class _FilterDropdownContent extends StatelessWidget {
   }
 }
 
+/// A single row in the filter dropdown, representing one category.
+///
+/// Shows a rounded checkbox, category icon, label, and an optional
+/// info tooltip (only visible if the category has a description).
+/// Tapping the row toggles the category in [MapStateProvider].
 class _FilterCategoryRow extends StatelessWidget {
+  /// The category data map from [LocationCategories.chips].
   final Map<String, dynamic> chip;
+
+  /// Builder function to create the icon widget for this category.
   final Widget Function(Map<String, dynamic>) iconBuilder;
 
   const _FilterCategoryRow({
@@ -296,7 +355,8 @@ class _FilterCategoryRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                // Rounded checkbox
+                // ---- Rounded checkbox ----
+                // Filled teal when checked, outlined grey when unchecked.
                 Container(
                   width: 24,
                   height: 24,
@@ -317,10 +377,12 @@ class _FilterCategoryRow extends StatelessWidget {
                       : null,
                 ),
                 const SizedBox(width: 12),
-                // Category icon
+
+                // ---- Category icon ----
                 iconBuilder(chip),
                 const SizedBox(width: 10),
-                // Label
+
+                // ---- Category label ----
                 Expanded(
                   child: Text(
                     label,
@@ -331,7 +393,9 @@ class _FilterCategoryRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Info button with tooltip
+
+                // ---- Info tooltip (shown only if description exists) ----
+                // Tap the info icon to see a tooltip with the category description.
                 if (description.isNotEmpty)
                   Tooltip(
                     message: description,

@@ -1,13 +1,34 @@
+// ============================================================
+// edit_profile_screen.dart — Edit username and profile photo
+// ============================================================
+// This screen allows the authenticated user to update their display
+// name and profile photo.  The photo can be changed via three methods:
+//
+//   1. Taking a new photo with the device camera.
+//   2. Picking an existing image from the gallery.
+//   3. Manually entering a URL pointing to an image.
+//
+// Image uploads are handled by [ImageUploadService], which stores
+// the file in Supabase Storage and returns a public URL.  The
+// profile update itself is persisted through [AuthService.updateUserProfile].
+//
+// The screen pre-populates the form with the current profile data
+// fetched from the Supabase `users` table on [initState].
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:myapp/src/services/auth_service.dart';
-import 'package:myapp/src/theme/theme.dart';
-import 'package:path/path.dart' as p;
+import 'package:goa_maps/src/services/auth_service.dart';
+import 'package:goa_maps/src/services/image_upload_service.dart';
+import 'package:goa_maps/src/theme/theme.dart';
 import 'dart:developer' as developer;
 
+/// [EditProfileScreen] is a StatefulWidget because it manages form
+/// controllers, loading/uploading flags, and needs to fetch existing
+/// profile data asynchronously.
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -15,28 +36,56 @@ class EditProfileScreen extends StatefulWidget {
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
+/// Private state for [EditProfileScreen].
+///
+/// Manages the form key, text controllers for the name and photo URL,
+/// loading indicators, and all the logic for picking / uploading images.
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  /// Global key used to validate the form before saving.
   final _formKey = GlobalKey<FormState>();
+
+  /// Controller for the "Full Name" text field.
   late TextEditingController _nameController;
+
+  /// Controller for the photo URL.  This is updated programmatically
+  /// when the user picks / uploads a photo, or enters a URL manually.
+  /// A listener is attached so the avatar preview rebuilds whenever
+  /// the URL changes.
   late TextEditingController _photoURLController;
+
+  /// `true` while the "Save" request is in flight; disables the save
+  /// button and shows a spinner.
   bool _isLoading = false;
+
+  /// `true` while an image is being uploaded to Supabase Storage;
+  /// disables the avatar tap and save button during the upload.
   bool _isUploading = false;
 
+  /// Initialises text controllers, attaches listeners, and loads the
+  /// current profile data from Supabase.
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _photoURLController = TextEditingController();
+
+    // Rebuild the widget whenever the photo URL changes so the avatar
+    // preview updates in real time.
     _photoURLController.addListener(() {
       if (mounted) setState(() {});
     });
+
+    // Fetch existing profile data to pre-populate the form fields.
     _loadProfile();
   }
 
+  /// Loads the current user's profile row from the Supabase `users`
+  /// table and populates the name and photo URL controllers.
   Future<void> _loadProfile() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     final user = authService.currentUser;
     if (user == null) return;
+
     try {
       final data = await Supabase.instance.client
           .from('users')
@@ -54,11 +103,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  /// Opens the device camera or photo gallery (based on [source]),
+  /// lets the user pick an image, uploads it to Supabase Storage,
+  /// and stores the resulting public URL in [_photoURLController].
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: source);
     if (pickedFile == null) return;
 
+    // Enter uploading state to show a progress indicator on the avatar.
     setState(() => _isUploading = true);
     try {
       final url = await _uploadImage(pickedFile);
@@ -73,31 +126,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
       }
     } finally {
+      // Always exit uploading state.
       if (mounted) setState(() => _isUploading = false);
     }
   }
 
-  Future<String> _uploadImage(XFile image) async {
-    final String extension = p.extension(image.path).toLowerCase();
-    final String safeExtension = extension.isNotEmpty ? extension : '.jpg';
-    final String fileName =
-        '${DateTime.now().millisecondsSinceEpoch}$safeExtension';
-    final String path = 'uploads/$fileName';
+  /// Delegates the actual file upload to [ImageUploadService] and
+  /// returns the public URL of the uploaded image.
+  Future<String> _uploadImage(XFile image) => ImageUploadService.uploadXFile(image);
 
-    final bytes = await image.readAsBytes();
-
-    await Supabase.instance.client.storage
-        .from('site_images')
-        .uploadBinary(
-          path,
-          bytes,
-          fileOptions: const FileOptions(upsert: true),
-        );
-    return Supabase.instance.client.storage
-        .from('site_images')
-        .getPublicUrl(path);
-  }
-
+  /// Shows a bottom sheet with options for changing the profile photo:
+  /// take a photo, choose from gallery, enter a URL, or remove the
+  /// current photo.
   void _showPhotoOptions() {
     showModalBottomSheet(
       context: context,
@@ -110,6 +150,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Drag handle pill.
               Container(
                 width: 40,
                 height: 4,
@@ -119,6 +160,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // Sheet title.
               Text(
                 'Change Profile Photo',
                 style: GoogleFonts.inter(
@@ -127,6 +170,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // Option 1: Take a photo with the camera.
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
@@ -146,6 +191,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   _pickImage(ImageSource.camera);
                 },
               ),
+
+              // Option 2: Choose an image from the device gallery.
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
@@ -165,6 +212,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   _pickImage(ImageSource.gallery);
                 },
               ),
+
+              // Option 3: Paste a URL pointing to an image.
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
@@ -184,6 +233,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   _showUrlDialog();
                 },
               ),
+
+              // Option 4: Remove the current photo (only shown if one exists).
               if (_photoURLController.text.trim().isNotEmpty)
                 ListTile(
                   leading: Container(
@@ -202,6 +253,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   onTap: () {
                     Navigator.pop(context);
+                    // Clear the photo URL to revert to the initial-letter avatar.
                     setState(() {
                       _photoURLController.text = '';
                     });
@@ -214,6 +266,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  /// Shows an alert dialog with a text field where the user can
+  /// manually enter (or paste) a photo URL.  Pressing "Set" updates
+  /// [_photoURLController] and the avatar preview.
   void _showUrlDialog() {
     final urlController =
         TextEditingController(text: _photoURLController.text);
@@ -230,10 +285,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         ),
         actions: [
+          // "Cancel" — closes the dialog without changes.
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
+          // "Set" — applies the entered URL and closes the dialog.
           ElevatedButton(
             onPressed: () {
               _photoURLController.text = urlController.text;
@@ -253,10 +310,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  /// Validates the form and persists the updated profile (display
+  /// name and photo URL) via [AuthService.updateUserProfile].
+  ///
+  /// On success, shows a confirmation snackbar and pops back to the
+  /// profile screen.  On failure, shows an error snackbar.
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
+
+    // Capture references before the async gap to avoid using
+    // BuildContext across async boundaries.
     final authService = Provider.of<AuthService>(context, listen: false);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -280,6 +345,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  /// Disposes text controllers to free resources.
   @override
   void dispose() {
     _nameController.dispose();
@@ -287,13 +353,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
+  /// Builds the edit profile form: avatar with camera overlay,
+  /// name text field, and a save button.
   @override
   Widget build(BuildContext context) {
+    // Read the current photo URL and name for the avatar preview.
     final photoUrl = _photoURLController.text.trim();
     final nameText = _nameController.text.trim();
 
     return Scaffold(
       appBar: AppBar(
+        // Back button to return to the profile screen.
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -308,7 +378,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 16),
-                // Avatar with tap to change photo
+
+                // ---- Avatar with tap-to-change overlay ----
+                // Tapping the avatar opens [_showPhotoOptions].
+                // While an upload is in progress, tapping is disabled
+                // and a spinner is shown instead of the avatar content.
                 Center(
                   child: GestureDetector(
                     onTap: _isUploading ? null : _showPhotoOptions,
@@ -337,6 +411,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     )
                                   : null,
                         ),
+                        // Small camera icon badge in the bottom-right corner.
                         Positioned(
                           bottom: 0,
                           right: 0,
@@ -358,6 +433,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+
+                // Helper text below the avatar.
                 Text(
                   'Tap to change photo',
                   style: GoogleFonts.inter(
@@ -366,7 +443,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                // Full Name label + field
+
+                // ---- "Full Name" label ----
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -379,6 +457,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+
+                // ---- Full Name text field ----
+                // Validated to ensure the user doesn't leave it blank.
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
@@ -393,7 +474,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   },
                 ),
                 const SizedBox(height: 40),
-                // Save button
+
+                // ---- Save button ----
+                // Disabled while loading or uploading.  Shows a spinner
+                // when the save request is in progress.
                 SizedBox(
                   width: double.infinity,
                   height: 56,

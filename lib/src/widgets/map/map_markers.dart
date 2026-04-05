@@ -1,3 +1,26 @@
+// ============================================================
+// map_markers.dart — Map marker builder functions
+// ============================================================
+// A collection of pure functions that construct [Marker] widgets
+// for the flutter_map package. These markers represent different
+// entities on the map:
+//
+//  - [buildLocationMarkers] — Creates markers for all filtered
+//    locations. Locations inside the radius get large markers
+//    with a label; those outside get small icon-only markers.
+//
+//  - [buildUserLocationMarker] — Creates a marker for the user's
+//    current GPS position. Renders a navigation-style "A" label
+//    when a route is active, or a standard blue dot otherwise.
+//
+//  - [buildWaypointMarkers] — Creates labelled markers (B, C, D,
+//    ...) for intermediate stops along a route.
+//
+//  - [buildDestinationMarker] — Creates a labelled marker for
+//    the final destination of a route (letter follows after the
+//    last waypoint, e.g., "C" if there is one waypoint "B").
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -5,14 +28,20 @@ import '../../models/location_model.dart';
 import '../../models/waypoint_model.dart';
 import '../../constants/categories.dart';
 
-/// Builds location markers, splitting into inside-radius (large with label)
-/// and outside-radius (small icon only).
+/// Builds markers for all [filteredLocations], splitting them into:
+///  - **Inside-radius markers**: large circle with category icon + name label.
+///  - **Outside-radius markers**: small circle with just the category icon.
+///
+/// [center] and [radiusMeters] define the "nearby" circle on the map.
+/// [onTap] is called when a marker is tapped, passing the associated
+/// [LocationModel] so the parent can open a detail sheet.
 List<Marker> buildLocationMarkers({
   required List<LocationModel> filteredLocations,
   required LatLng center,
   required double radiusMeters,
   required void Function(LocationModel location) onTap,
 }) {
+  // Haversine distance calculator from the latlong2 package
   const distanceCalc = Distance();
 
   return filteredLocations.map((loc) {
@@ -21,6 +50,7 @@ List<Marker> buildLocationMarkers({
     final isInsideRadius = metersFromCenter <= radiusMeters;
 
     if (isInsideRadius) {
+      // ---- Large marker with icon and name label ----
       final iconAsset = LocationCategories.getIconAsset(loc.category);
       return Marker(
         point: locPoint,
@@ -30,6 +60,7 @@ List<Marker> buildLocationMarkers({
           onTap: () => onTap(loc),
           child: Column(
             children: [
+              // Circular icon container
               Container(
                 width: 45,
                 height: 45,
@@ -42,6 +73,7 @@ List<Marker> buildLocationMarkers({
                   ],
                 ),
                 child: Center(
+                  // Use a custom asset image if available, otherwise a Material icon
                   child: iconAsset != null
                       ? Image.asset(
                           iconAsset,
@@ -58,6 +90,7 @@ List<Marker> buildLocationMarkers({
                 ),
               ),
               const SizedBox(height: 4),
+              // Name label below the icon
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 6,
@@ -85,6 +118,7 @@ List<Marker> buildLocationMarkers({
         ),
       );
     } else {
+      // ---- Small marker with just the icon (outside radius) ----
       final iconAsset = LocationCategories.getIconAsset(loc.category);
       return Marker(
         point: locPoint,
@@ -130,11 +164,16 @@ List<Marker> buildLocationMarkers({
 }
 
 /// Builds the current user location marker.
+///
+/// When [hasActiveRoute] is true, the marker is shown as a teal circle
+/// with the letter "A" (origin of the route). Otherwise, it renders as
+/// a standard blue dot with a white border (standard GPS indicator).
 Marker buildUserLocationMarker({
   required LatLng userPoint,
   required bool hasActiveRoute,
 }) {
   if (hasActiveRoute) {
+    // Route origin marker labelled "A"
     return Marker(
       point: userPoint,
       width: 36,
@@ -161,6 +200,7 @@ Marker buildUserLocationMarker({
       ),
     );
   } else {
+    // Standard blue GPS dot
     return Marker(
       point: userPoint,
       width: 30,
@@ -184,9 +224,13 @@ Marker buildUserLocationMarker({
 }
 
 /// Builds waypoint markers labeled B, C, D, etc.
+///
+/// Each [Waypoint] in the list gets a teal circle with its
+/// corresponding letter. The letter is computed as
+/// `String.fromCharCode(66 + i)` where 66 is ASCII 'B'.
 List<Marker> buildWaypointMarkers(List<Waypoint> waypoints) {
   return List.generate(waypoints.length, (i) {
-    final label = String.fromCharCode(66 + i); // B, C, D, ...
+    final label = String.fromCharCode(66 + i); // B=66, C=67, D=68, ...
     return Marker(
       point: waypoints[i].latLng,
       width: 36,
@@ -216,6 +260,9 @@ List<Marker> buildWaypointMarkers(List<Waypoint> waypoints) {
 }
 
 /// Builds the destination marker with the next letter after waypoints.
+///
+/// If there are 0 waypoints, the destination is labelled "B".
+/// If there is 1 waypoint (labelled "B"), the destination is "C", etc.
 Marker buildDestinationMarker({
   required LatLng destination,
   required int waypointCount,

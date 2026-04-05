@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:myapp/src/screens/admin/detailed_edit_screen.dart';
-import 'package:myapp/src/screens/edit_profile_screen.dart';
-import 'package:myapp/src/screens/onboarding_screen.dart';
-import 'package:myapp/src/services/auth_service.dart';
-import 'package:myapp/src/screens/admin_home_screen.dart';
-import 'package:myapp/src/screens/admin/content_upload_screen.dart';
-import 'package:myapp/src/screens/admin/edit_content_screen.dart';
-import 'package:myapp/src/screens/admin/user_management_screen.dart';
+import 'package:goa_maps/src/screens/admin/detailed_edit_screen.dart';
+import 'package:goa_maps/src/screens/edit_profile_screen.dart';
+import 'package:goa_maps/src/screens/onboarding_screen.dart';
+import 'package:goa_maps/src/services/auth_service.dart';
+import 'package:goa_maps/src/screens/admin_home_screen.dart';
+import 'package:goa_maps/src/screens/admin/content_upload_screen.dart';
+import 'package:goa_maps/src/screens/admin/edit_content_screen.dart';
+import 'package:goa_maps/src/screens/admin/user_management_screen.dart';
 import 'mock_map_screen.dart';
 
 class TestAppRouter {

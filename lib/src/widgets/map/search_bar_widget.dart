@@ -1,3 +1,19 @@
+// ============================================================
+// search_bar_widget.dart — Map location search input & results
+// ============================================================
+// A search bar widget placed at the top of the map screen.
+// As the user types, it queries [MapStateProvider.search] against
+// the list of known locations from [LocationProvider] and
+// displays matching results in a dropdown overlay.
+//
+// Selecting a result fires [onDestinationSelected] with the
+// location's coordinates and name, allowing the parent to fly
+// the map camera to the chosen point.
+//
+// The widget manages its own [TextEditingController] and
+// [FocusNode] for the text field lifecycle.
+// ============================================================
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,7 +21,11 @@ import 'package:latlong2/latlong.dart';
 import '../../providers/map_state_provider.dart';
 import '../../providers/location_provider.dart';
 
+/// Stateful because it owns a [TextEditingController] and
+/// [FocusNode] that require disposal.
 class MapSearchBar extends StatefulWidget {
+  /// Callback invoked when the user taps a search result.
+  /// Receives the selected location's coordinates and display name.
   final Function(LatLng destination, String name)? onDestinationSelected;
 
   const MapSearchBar({super.key, this.onDestinationSelected});
@@ -15,7 +35,10 @@ class MapSearchBar extends StatefulWidget {
 }
 
 class _MapSearchBarState extends State<MapSearchBar> {
+  /// Controls the text content of the search field.
   final TextEditingController _controller = TextEditingController();
+
+  /// Manages keyboard focus for the search field.
   final FocusNode _focusNode = FocusNode();
 
   @override
@@ -33,7 +56,7 @@ class _MapSearchBarState extends State<MapSearchBar> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Search input
+        // ---- Search text field ----
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -46,10 +69,12 @@ class _MapSearchBarState extends State<MapSearchBar> {
             controller: _controller,
             focusNode: _focusNode,
             onChanged: (value) {
+              // Toggle searching state and filter locations.
               mapState.setSearching(value.isNotEmpty);
               mapState.search(value, locationProvider.locations);
             },
             onTap: () {
+              // Re-open results if the field already has text.
               if (_controller.text.isNotEmpty) {
                 mapState.setSearching(true);
               }
@@ -59,6 +84,7 @@ class _MapSearchBarState extends State<MapSearchBar> {
               hintText: 'Search a location...',
               hintStyle: GoogleFonts.inter(color: Colors.grey, fontSize: 14),
               prefixIcon: const Icon(Icons.search, color: Color(0xFF005A60)),
+              // Show a clear button when the field is not empty.
               suffixIcon: _controller.text.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
@@ -81,7 +107,9 @@ class _MapSearchBarState extends State<MapSearchBar> {
           ),
         ),
 
-        // Search results dropdown
+        // ---- Search results dropdown ----
+        // Shown only when the user is actively searching and there
+        // are results (or a loading indicator) to display.
         if (mapState.isSearching && (mapState.searchResults.isNotEmpty || mapState.isLoadingSearch))
           Container(
             margin: const EdgeInsets.only(top: 4),
@@ -99,6 +127,7 @@ class _MapSearchBarState extends State<MapSearchBar> {
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
                 children: [
+                  // Result tiles — one per matching location.
                   ...mapState.searchResults.map((result) {
                     return ListTile(
                       dense: true,
@@ -114,6 +143,8 @@ class _MapSearchBarState extends State<MapSearchBar> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       onTap: () {
+                        // Fill the field, close the keyboard and
+                        // results, then notify the parent.
                         _controller.text = result.name;
                         _focusNode.unfocus();
                         mapState.setSearching(false);
@@ -124,6 +155,7 @@ class _MapSearchBarState extends State<MapSearchBar> {
                       },
                     );
                   }),
+                  // Loading spinner (shown during geocoding lookups).
                   if (mapState.isLoadingSearch)
                     const Padding(
                       padding: EdgeInsets.all(12),

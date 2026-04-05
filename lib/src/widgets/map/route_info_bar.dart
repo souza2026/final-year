@@ -1,3 +1,24 @@
+// ============================================================
+// route_info_bar.dart — Direction panel (setup + route info)
+// ============================================================
+// A dual-mode bottom sheet that handles route planning and
+// active route display on the map screen:
+//
+//   **Setup mode** — Shown when the user opens directions but
+//   has not yet calculated a route.  Provides an origin label
+//   ("My Location"), a searchable destination picker, optional
+//   intermediate stop slots, and a "Calculate Route" button.
+//
+//   **Route info mode** — Shown once a route is active.
+//   Displays the destination name, total distance / duration,
+//   a "Start" navigation button, and an expandable list of
+//   waypoints.  The panel supports vertical drag gestures to
+//   expand, collapse, or dismiss.
+//
+// The widget communicates route lifecycle events to the parent
+// via [onRouteCalculated] and [onRouteClosed] callbacks.
+// ============================================================
+
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,9 +29,13 @@ import '../../providers/location_provider.dart';
 import '../../models/location_model.dart';
 import '../../models/waypoint_model.dart';
 
-/// Dedicated direction panel: setup mode (pick stops) + route info mode.
+/// Stateful because it manages animation controllers, picker state,
+/// selected stops, and drag-dismiss offsets.
 class DirectionPanel extends StatefulWidget {
+  /// Called after a route has been successfully calculated.
   final VoidCallback? onRouteCalculated;
+
+  /// Called when the user dismisses or clears the active route.
   final VoidCallback? onRouteClosed;
 
   const DirectionPanel({super.key, this.onRouteCalculated, this.onRouteClosed});
@@ -21,19 +46,36 @@ class DirectionPanel extends StatefulWidget {
 
 class _DirectionPanelState extends State<DirectionPanel>
     with SingleTickerProviderStateMixin {
+  /// Controls the expand/collapse animation of the route info panel.
   late final AnimationController _expandController;
 
-  // Setup mode state
+  // ---- Setup mode state ----
+
+  /// The location the user chose as the final destination.
   LocationModel? _selectedDestination;
+
+  /// Optional intermediate stops between origin and destination.
   final List<LocationModel?> _selectedStops = [];
 
-  // Location picker state
-  int _activePickerIndex = -1; // -1=none, 0=destination, 1+=stop index+1
+  // ---- Location picker state ----
+
+  /// Which slot the picker is filling:
+  /// `-1` = picker closed, `0` = destination, `1+` = stop at index-1.
+  int _activePickerIndex = -1;
+
+  /// Current search query in the location picker text field.
   String _pickerQuery = '';
+
+  /// Controller for the picker search text field.
   final TextEditingController _pickerController = TextEditingController();
+
+  /// Focus node for the picker — automatically focused when opened.
   final FocusNode _pickerFocusNode = FocusNode();
 
-  // Dismiss tracking
+  // ---- Drag dismiss tracking ----
+
+  /// Vertical offset applied while the user drags to dismiss the
+  /// route info panel.  When it exceeds 60 px the panel is cleared.
   double _dismissOffset = 0.0;
 
   @override
@@ -53,6 +95,7 @@ class _DirectionPanelState extends State<DirectionPanel>
     super.dispose();
   }
 
+  /// Resets all setup-mode fields to their initial empty state.
   void _clearSetup() {
     setState(() {
       _selectedDestination = null;
@@ -63,6 +106,8 @@ class _DirectionPanelState extends State<DirectionPanel>
     });
   }
 
+  /// Opens the location picker for the slot at [index]
+  /// (0 = destination, 1+ = stop).
   void _openPicker(int index) {
     setState(() {
       _activePickerIndex = index;
@@ -74,6 +119,8 @@ class _DirectionPanelState extends State<DirectionPanel>
     });
   }
 
+  /// Assigns [loc] to the currently active picker slot and closes
+  /// the picker.
   void _selectLocation(LocationModel loc) {
     setState(() {
       if (_activePickerIndex == 0) {
@@ -90,6 +137,7 @@ class _DirectionPanelState extends State<DirectionPanel>
     });
   }
 
+  /// Appends a new empty stop slot (up to [MapStateProvider.maxWaypoints]).
   void _addStopSlot() {
     if (_selectedStops.length < MapStateProvider.maxWaypoints) {
       setState(() {
@@ -100,6 +148,7 @@ class _DirectionPanelState extends State<DirectionPanel>
     }
   }
 
+  /// Removes the intermediate stop at [index] from the list.
   void _removeStop(int index) {
     setState(() {
       _selectedStops.removeAt(index);
@@ -109,6 +158,8 @@ class _DirectionPanelState extends State<DirectionPanel>
     });
   }
 
+  /// Builds the waypoint list from the selected stops and delegates
+  /// route calculation to [MapStateProvider.calculateRoute].
   Future<void> _calculateRoute() async {
     if (_selectedDestination == null) return;
 
@@ -136,6 +187,8 @@ class _DirectionPanelState extends State<DirectionPanel>
     widget.onRouteCalculated?.call();
   }
 
+  /// Clears the active route, resets the setup fields, and notifies
+  /// the parent via [onRouteClosed].
   void _clearRoute(MapStateProvider mapState) {
     mapState.clearRoute();
     _clearSetup();
@@ -144,6 +197,8 @@ class _DirectionPanelState extends State<DirectionPanel>
     widget.onRouteClosed?.call();
   }
 
+  /// Switches from route-info mode back to setup mode, pre-populating
+  /// the destination and stops from the active route.
   void _editRoute(MapStateProvider mapState) {
     // Populate setup fields from active route
     final locProvider = Provider.of<LocationProvider>(context, listen: false);
@@ -167,6 +222,9 @@ class _DirectionPanelState extends State<DirectionPanel>
     mapState.setDirectionPanelOpen(true);
   }
 
+  /// Returns the DB location closest to [point], or null if none is
+  /// within 500 m. Used when editing a route to match waypoints back
+  /// to known locations.
   LocationModel? _findClosestLocation(List<LocationModel> locations, LatLng point) {
     const dist = Distance();
     LocationModel? closest;
@@ -181,7 +239,9 @@ class _DirectionPanelState extends State<DirectionPanel>
     return (minDist < 500) ? closest : null; // within 500m
   }
 
-  // --- Drag handling for route info mode ---
+  /// Handles vertical drag updates in route-info mode.
+  /// Upward drags expand the panel; downward drags either collapse
+  /// or begin the dismiss gesture.
   void _onDragUpdate(DragUpdateDetails details) {
     final dy = details.primaryDelta ?? 0;
     if (_expandController.value > 0) {
@@ -202,6 +262,8 @@ class _DirectionPanelState extends State<DirectionPanel>
     }
   }
 
+  /// Finalises the drag gesture — snaps the panel open/closed or
+  /// dismisses the route if dragged far enough.
   void _onDragEnd(DragEndDetails details, MapStateProvider mapState) {
     final velocity = details.primaryVelocity ?? 0;
     if (_dismissOffset > 0) {
@@ -242,6 +304,8 @@ class _DirectionPanelState extends State<DirectionPanel>
 
   // ===================== SETUP MODE =====================
 
+  /// Builds the route planning UI: origin, stops, destination,
+  /// location picker, and the "Calculate Route" button.
   Widget _buildSetupMode(BuildContext context, MapStateProvider mapState, LocationProvider locProvider) {
     final bottomPad = MediaQuery.of(context).padding.bottom;
     final locations = locProvider.locations;
@@ -441,6 +505,8 @@ class _DirectionPanelState extends State<DirectionPanel>
     );
   }
 
+  /// Returns `true` if [loc] is the location currently being edited
+  /// by the picker (so it stays visible in the filtered list).
   bool _isCurrentPickerTarget(LocationModel loc) {
     if (_activePickerIndex == 0) return loc.id == _selectedDestination?.id;
     if (_activePickerIndex > 0) {
@@ -450,6 +516,8 @@ class _DirectionPanelState extends State<DirectionPanel>
     return false;
   }
 
+  /// Builds a single row in the setup mode list (origin, stop, or
+  /// destination). Supports tap-to-select, remove, and placeholder states.
   Widget _buildLocationRow({
     required IconData icon,
     required Color iconColor,
@@ -499,6 +567,8 @@ class _DirectionPanelState extends State<DirectionPanel>
 
   // ===================== ROUTE INFO MODE =====================
 
+  /// Builds the active-route panel with destination name, distance,
+  /// duration, start-navigation button, and expandable waypoint list.
   Widget _buildRouteInfoMode(BuildContext context, MapStateProvider mapState, LocationProvider locProvider) {
     final bottomPad = MediaQuery.of(context).padding.bottom;
     final waypointCount = mapState.waypoints.length;
@@ -676,6 +746,7 @@ class _DirectionPanelState extends State<DirectionPanel>
     );
   }
 
+  /// Small pill-shaped drag handle at the top of the panel.
   Widget _buildDragHandle() {
     return Center(
       child: Container(
