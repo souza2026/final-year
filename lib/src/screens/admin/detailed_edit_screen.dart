@@ -21,6 +21,8 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
   late TextEditingController _longDescriptionController;
   late TextEditingController _latitudeController;
   late TextEditingController _longitudeController;
+  late TextEditingController _howToController;
+  late TextEditingController _whatToController;
 
   List<String> _existingImageUrls = [];
   final List<File> _newImages = [];
@@ -36,6 +38,8 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
     _longDescriptionController = TextEditingController();
     _latitudeController = TextEditingController();
     _longitudeController = TextEditingController();
+    _howToController = TextEditingController();
+    _whatToController = TextEditingController();
     _loadData();
   }
 
@@ -53,6 +57,8 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
         _longDescriptionController.text = doc['longDescription'] ?? '';
         _latitudeController.text = (doc['latitude'] ?? 0.0).toString();
         _longitudeController.text = (doc['longitude'] ?? 0.0).toString();
+        _howToController.text = doc['howTo'] ?? '';
+        _whatToController.text = doc['whatTo'] ?? '';
         _selectedCategory = doc['category'] as String?;
 
         final List<String> images = [];
@@ -145,6 +151,8 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
             'latitude': double.tryParse(_latitudeController.text) ?? 0.0,
             'longitude': double.tryParse(_longitudeController.text) ?? 0.0,
             'category': _selectedCategory ?? '',
+            'howTo': _howToController.text,
+            'whatTo': _whatToController.text,
             'imageUrl': allImageUrls.isNotEmpty ? allImageUrls.first : null,
             'images': allImageUrls,
           })
@@ -189,6 +197,8 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
     _longDescriptionController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
+    _howToController.dispose();
+    _whatToController.dispose();
     super.dispose();
   }
 
@@ -238,6 +248,20 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
                     _longDescriptionController,
                     'Detailed History / Long Description',
                     maxLines: 8,
+                    isRequired: false,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    _howToController,
+                    'How to Get There',
+                    maxLines: 4,
+                    isRequired: false,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    _whatToController,
+                    'What to Look For',
+                    maxLines: 4,
                     isRequired: false,
                   ),
                   const SizedBox(height: 24),

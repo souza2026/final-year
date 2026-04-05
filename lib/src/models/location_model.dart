@@ -9,6 +9,8 @@ class LocationModel {
   final String longDescription;
   final List<String> images;
   final String category;
+  final String howTo;
+  final String whatTo;
 
   LocationModel({
     required this.id,
@@ -19,6 +21,8 @@ class LocationModel {
     this.longDescription = '',
     required this.images,
     this.category = '',
+    this.howTo = '',
+    this.whatTo = '',
   });
 
   factory LocationModel.fromMap(Map<String, dynamic> map) {
@@ -31,6 +35,8 @@ class LocationModel {
       longDescription: map['longDescription'] ?? '',
       images: List<String>.from(map['images'] ?? []),
       category: map['category'] ?? '',
+      howTo: map['howTo'] ?? '',
+      whatTo: map['whatTo'] ?? '',
     );
   }
 

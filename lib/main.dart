@@ -7,6 +7,7 @@ import 'src/routing/app_router.dart';
 import 'src/theme/theme.dart';
 import 'src/providers/location_provider.dart';
 import 'src/providers/map_state_provider.dart';
+import 'src/models/location_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +40,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => MapStateProvider()),
         ChangeNotifierProvider(create: (_) => ValueNotifier<int>(0)),
+        ChangeNotifierProvider(create: (_) => ValueNotifier<LocationModel?>(null)),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {

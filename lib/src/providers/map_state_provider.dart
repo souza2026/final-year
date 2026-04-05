@@ -294,8 +294,10 @@ class MapStateProvider extends ChangeNotifier {
     if (_selectedCategories.isEmpty) {
       return locations;
     }
+    final lowerCategories =
+        _selectedCategories.map((c) => c.toLowerCase()).toSet();
     return locations
-        .where((loc) => _selectedCategories.contains(loc.category))
+        .where((loc) => lowerCategories.contains(loc.category.toLowerCase()))
         .toList();
   }
 

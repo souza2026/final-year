@@ -13,6 +13,7 @@ import '../widgets/map/location_name_chip.dart';
 import '../widgets/map/radius_selector_widget.dart';
 import '../widgets/map/route_info_bar.dart'; // DirectionPanel
 import '../widgets/map/category_chips_widget.dart';
+import '../constants/categories.dart';
 import '../widgets/map/navigation_bar_widget.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
@@ -127,249 +128,282 @@ class _MapScreenState extends State<MapScreen> {
     LocationModel location,
     loc.LocationData? currentLocation,
   ) {
+    String distanceText = '';
+    if (currentLocation != null &&
+        currentLocation.latitude != null &&
+        currentLocation.longitude != null) {
+      const Distance distance = Distance();
+      final double meter = distance(
+        LatLng(currentLocation.latitude!, currentLocation.longitude!),
+        LatLng(location.latitude, location.longitude),
+      );
+      if (meter > 1000) {
+        distanceText = '${(meter / 1000).toStringAsFixed(1)} km away';
+      } else {
+        distanceText = '${meter.round()} m away';
+      }
+    }
+
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.9,
-          builder: (_, controller) {
-            String distanceText = '';
-            if (currentLocation != null &&
-                currentLocation.latitude != null &&
-                currentLocation.longitude != null) {
-              const Distance distance = Distance();
-              final double meter = distance(
-                LatLng(currentLocation.latitude!, currentLocation.longitude!),
-                LatLng(location.latitude, location.longitude),
-              );
-              if (meter > 1000) {
-                distanceText = '${(meter / 1000).toStringAsFixed(1)} km away';
-              } else {
-                distanceText = '${meter.round()} m away';
-              }
-            }
-
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: ListView(
-                controller: controller,
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 5,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  Text(
-                    location.name,
-                    style: GoogleFonts.oswald(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                location.name,
+                style: GoogleFonts.oswald(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF005A60),
+                ),
+              ),
+              if (location.category.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF005A60).withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    LocationCategories.getLabel(location.category),
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                       color: const Color(0xFF005A60),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    location.description,
-                    style: GoogleFonts.openSans(
-                      fontSize: 16,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        context.read<ValueNotifier<int>>().value = 1;
-                      },
-                      icon: const Icon(Icons.history_edu, size: 18),
-                      label: Text(
-                        'View Details',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF005A60),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (location.images.isNotEmpty)
-                    SizedBox(
-                      height: 200,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: location.images.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: location.images[index].startsWith('http')
+                ),
+              ],
+              if (location.images.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 180,
+                  child: location.images.length == 1
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: location.images.first.startsWith('http')
+                              ? CachedNetworkImage(
+                                  imageUrl: location.images.first,
+                                  width: double.infinity,
+                                  height: 180,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
+                                    color: Colors.grey[200],
+                                    child: const Icon(Icons.error, color: Colors.red),
+                                  ),
+                                )
+                              : Image.file(
+                                  File(location.images.first),
+                                  width: double.infinity,
+                                  height: 180,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: Colors.grey[200],
+                                    child: const Icon(Icons.error, color: Colors.red),
+                                  ),
+                                ),
+                        )
+                      : ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: location.images.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemBuilder: (context, index) {
+                            final img = location.images[index];
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: img.startsWith('http')
                                   ? CachedNetworkImage(
-                                      imageUrl: location.images[index],
-                                      width: 280,
+                                      imageUrl: img,
+                                      width: 240,
+                                      height: 180,
                                       fit: BoxFit.cover,
                                       placeholder: (context, url) => Container(
-                                        width: 280,
+                                        width: 240,
                                         color: Colors.grey[200],
-                                        child: const Center(
-                                          child: CircularProgressIndicator(),
-                                        ),
+                                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                       ),
-                                      errorWidget: (context, url, error) =>
-                                          Container(
-                                        width: 280,
+                                      errorWidget: (context, url, error) => Container(
+                                        width: 240,
                                         color: Colors.grey[200],
-                                        child: const Icon(
-                                          Icons.error,
-                                          color: Colors.red,
-                                        ),
+                                        child: const Icon(Icons.error, color: Colors.red),
                                       ),
                                     )
                                   : Image.file(
-                                      File(location.images[index]),
-                                      width: 280,
+                                      File(img),
+                                      width: 240,
+                                      height: 180,
                                       fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          width: 280,
-                                          color: Colors.grey[200],
-                                          child: const Icon(
-                                            Icons.error,
-                                            color: Colors.red,
-                                          ),
-                                        );
-                                      },
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: 240,
+                                        color: Colors.grey[200],
+                                        child: const Icon(Icons.error, color: Colors.red),
+                                      ),
                                     ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  Builder(
-                    builder: (context) {
-                      final mapState = context.read<MapStateProvider>();
-                      final canAddStop = mapState.canAddStop;
-
-                      return Column(
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                if (currentLocation != null &&
-                                    currentLocation.latitude != null &&
-                                    currentLocation.longitude != null) {
-                                  final origin = LatLng(
-                                    currentLocation.latitude!,
-                                    currentLocation.longitude!,
-                                  );
-                                  final destination = LatLng(location.latitude, location.longitude);
-                                  Navigator.pop(context);
-                                  await mapState.selectDestination(origin, destination, location.name);
-                                  _fitBoundsForRoute(origin, [destination]);
-                                  setState(() {});
-                                }
-                              },
-                              icon: const Icon(Icons.directions, color: Colors.white),
-                              label: Text(
-                                distanceText.isNotEmpty
-                                    ? 'Get Directions ($distanceText)'
-                                    : 'Get Directions',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF005A60),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 2,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: canAddStop
-                                  ? () async {
-                                      if (currentLocation != null &&
-                                          currentLocation.latitude != null &&
-                                          currentLocation.longitude != null) {
-                                        final origin = LatLng(
-                                          currentLocation.latitude!,
-                                          currentLocation.longitude!,
-                                        );
-                                        final point = LatLng(location.latitude, location.longitude);
-                                        Navigator.pop(context);
-                                        await mapState.addWaypoint(origin, point, location.name);
-                                        final allPoints = [
-                                          ...mapState.waypoints.map((w) => w.latLng),
-                                          if (mapState.routeDestination != null) mapState.routeDestination!,
-                                        ];
-                                        _fitBoundsForRoute(origin, allPoints);
-                                        setState(() {});
-                                      }
-                                    }
-                                  : null,
-                              icon: Icon(
-                                Icons.add_location_alt,
-                                color: canAddStop ? const Color(0xFF005A60) : Colors.grey[400],
-                              ),
-                              label: Text(
-                                'Add Stop',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: canAddStop ? const Color(0xFF005A60) : Colors.grey[400],
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(
-                                  color: canAddStop ? const Color(0xFF005A60) : Colors.grey[300]!,
-                                  width: 2,
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
+                            );
+                          },
+                        ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                location.description,
+                style: GoogleFonts.openSans(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
-            );
-          },
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.read<ValueNotifier<LocationModel?>>().value = location;
+                    context.read<ValueNotifier<int>>().value = 1;
+                  },
+                  icon: const Icon(Icons.menu_book, size: 18),
+                  label: Text(
+                    'Know More',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF005A60),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Builder(
+                builder: (context) {
+                  final mapState = context.read<MapStateProvider>();
+                  final canAddStop = mapState.canAddStop;
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (currentLocation != null &&
+                                currentLocation.latitude != null &&
+                                currentLocation.longitude != null) {
+                              final origin = LatLng(
+                                currentLocation.latitude!,
+                                currentLocation.longitude!,
+                              );
+                              final destination = LatLng(location.latitude, location.longitude);
+                              Navigator.pop(context);
+                              await mapState.selectDestination(origin, destination, location.name);
+                              _fitBoundsForRoute(origin, [destination]);
+                              setState(() {});
+                            }
+                          },
+                          icon: const Icon(Icons.directions, size: 18, color: Colors.white),
+                          label: Flexible(
+                            child: Text(
+                              distanceText.isNotEmpty
+                                  ? 'Directions ($distanceText)'
+                                  : 'Get Directions',
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF005A60),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: ElevatedButton.icon(
+                          onPressed: canAddStop
+                              ? () async {
+                                  if (currentLocation != null &&
+                                      currentLocation.latitude != null &&
+                                      currentLocation.longitude != null) {
+                                    final origin = LatLng(
+                                      currentLocation.latitude!,
+                                      currentLocation.longitude!,
+                                    );
+                                    final point = LatLng(location.latitude, location.longitude);
+                                    Navigator.pop(context);
+                                    await mapState.addWaypoint(origin, point, location.name);
+                                    final allPoints = [
+                                      ...mapState.waypoints.map((w) => w.latLng),
+                                      if (mapState.routeDestination != null) mapState.routeDestination!,
+                                    ];
+                                    _fitBoundsForRoute(origin, allPoints);
+                                    setState(() {});
+                                  }
+                                }
+                              : null,
+                          icon: Icon(
+                            Icons.add_location_alt,
+                            size: 18,
+                            color: canAddStop ? Colors.white : Colors.grey[400],
+                          ),
+                          label: Text(
+                            'Add Stop',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: canAddStop
+                                ? Colors.red[400]
+                                : Colors.grey[200],
+                            foregroundColor: canAddStop ? Colors.white : Colors.grey[400],
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -412,6 +446,7 @@ class _MapScreenState extends State<MapScreen> {
             final isInsideRadius = metersFromCenter <= radiusMeters;
 
             if (isInsideRadius) {
+              final iconAsset = LocationCategories.getIconAsset(loc.category);
               return Marker(
                 point: locPoint,
                 width: 150,
@@ -426,26 +461,27 @@ class _MapScreenState extends State<MapScreen> {
                         height: 45,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
+                          color: const Color(0xFF005A60),
                           border: Border.all(color: Colors.white, width: 2),
                           boxShadow: const [
                             BoxShadow(color: Colors.black26, blurRadius: 4),
                           ],
-                          image: loc.images.isNotEmpty
-                              ? DecorationImage(
-                                  image: loc.images.first.startsWith('http')
-                                      ? CachedNetworkImageProvider(
-                                              loc.images.first)
-                                          as ImageProvider
-                                      : FileImage(File(loc.images.first)),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                          color: const Color(0xFF005A60),
                         ),
-                        child: loc.images.isEmpty
-                            ? const Icon(Icons.location_on,
-                                color: Colors.white)
-                            : null,
+                        child: Center(
+                          child: iconAsset != null
+                              ? Image.asset(
+                                  iconAsset,
+                                  width: 24,
+                                  height: 24,
+                                  color: Colors.white,
+                                  colorBlendMode: BlendMode.srcIn,
+                                )
+                              : Icon(
+                                  LocationCategories.getIcon(loc.category),
+                                  size: 24,
+                                  color: Colors.white,
+                                ),
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Container(
@@ -475,6 +511,7 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               );
             } else {
+              final iconAsset = LocationCategories.getIconAsset(loc.category);
               return Marker(
                 point: locPoint,
                 width: 40,
@@ -485,15 +522,30 @@ class _MapScreenState extends State<MapScreen> {
                   behavior: HitTestBehavior.opaque,
                   child: Center(
                     child: Container(
-                      width: 24,
-                      height: 24,
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF005A60),
+                        color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: const Color(0xFF005A60), width: 2),
                         boxShadow: const [
                           BoxShadow(color: Colors.black26, blurRadius: 2),
                         ],
+                      ),
+                      child: Center(
+                        child: iconAsset != null
+                            ? Image.asset(
+                                iconAsset,
+                                width: 16,
+                                height: 16,
+                                color: const Color(0xFF005A60),
+                                colorBlendMode: BlendMode.srcIn,
+                              )
+                            : Icon(
+                                LocationCategories.getIcon(loc.category),
+                                size: 16,
+                                color: const Color(0xFF005A60),
+                              ),
                       ),
                     ),
                   ),

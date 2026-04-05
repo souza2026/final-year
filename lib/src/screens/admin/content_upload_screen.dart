@@ -121,6 +121,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         longitude: double.tryParse(formData['longitude'].toString()) ?? 73.9814,
         images: imageUrls,
         category: formData['category'] ?? '',
+        howTo: formData['how_to'] ?? '',
+        whatTo: formData['what_to'] ?? '',
       );
 
       if (mounted) {
@@ -251,6 +253,20 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                         name: 'long_description',
                         hint: 'Detailed History / Long Description',
                         maxLines: 8,
+                        validators: [],
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        name: 'how_to',
+                        hint: 'How to Get There',
+                        maxLines: 4,
+                        validators: [],
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        name: 'what_to',
+                        hint: 'What to Look For',
+                        maxLines: 4,
                         validators: [],
                       ),
                       const SizedBox(height: 16),
@@ -510,7 +526,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           ? 150
           : (name == 'data_about_site'
               ? 500
-              : (name == 'long_description' ? 5000 : null)),
+              : (name == 'long_description' || name == 'how_to' || name == 'what_to'
+                  ? 5000
+                  : null)),
       validator: FormBuilderValidators.compose(validators ?? []),
       decoration: InputDecoration(
         hintText: hint,

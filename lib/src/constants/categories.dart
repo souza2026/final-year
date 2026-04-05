@@ -9,6 +9,31 @@ class LocationCategories {
   static const String stoneAgeRockCarvings = 'stone_age_rock_carvings';
   static const String fort = 'fort';
 
+  /// Get the chip data for a category key, or null if not found.
+  static Map<String, dynamic>? getChip(String key) {
+    try {
+      final lowerKey = key.toLowerCase();
+      return chips.firstWhere((c) => (c['key'] as String).toLowerCase() == lowerKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Get the display label for a category key.
+  static String getLabel(String key) {
+    return getChip(key)?['label'] as String? ?? key.replaceAll('_', ' ');
+  }
+
+  /// Get the icon asset path for a category key, or null.
+  static String? getIconAsset(String key) {
+    return getChip(key)?['iconAsset'] as String?;
+  }
+
+  /// Get the fallback IconData for a category key.
+  static IconData getIcon(String key) {
+    return getChip(key)?['icon'] as IconData? ?? Icons.location_on;
+  }
+
   static const List<Map<String, dynamic>> chips = [
     {
       'key': christTheKing,

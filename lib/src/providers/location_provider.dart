@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:location/location.dart' as loc;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/location_model.dart';
@@ -83,6 +82,8 @@ class LocationProvider extends ChangeNotifier {
         'images': newLocation.images,
         'longDescription': newLocation.longDescription,
         'category': newLocation.category,
+        'howTo': newLocation.howTo,
+        'whatTo': newLocation.whatTo,
         'createdAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {
@@ -91,57 +92,7 @@ class LocationProvider extends ChangeNotifier {
   }
 
   Future<void> _loadLocations() async {
-    // 1. Initial Local Fallback: Load the local JSON so the map is never empty
-    try {
-      final String jsonString = await rootBundle.loadString(
-        'assets/data/locations.json',
-      );
-      final List<dynamic> jsonResponses = jsonDecode(jsonString);
-
-      List<LocationModel> loadedLocs = jsonResponses.map((item) {
-        return LocationModel(
-          id: item['id']?.toString() ?? '0',
-          name: item['name'] ?? 'Untitled',
-          latitude: (item['latitude'] as num?)?.toDouble() ?? 0.0,
-          longitude: (item['longitude'] as num?)?.toDouble() ?? 0.0,
-          description: item['description'] ?? '',
-          longDescription: item['longDescription'] ?? '',
-          images: item['images'] != null
-              ? List<String>.from(item['images'])
-              : [],
-          category: item['category'] ?? '',
-        );
-      }).toList();
-
-      final prefs = await SharedPreferences.getInstance();
-      final customLocsString = prefs.getString('custom_locations');
-      if (customLocsString != null) {
-        final List<dynamic> customLocs = jsonDecode(customLocsString);
-        loadedLocs.addAll(
-          customLocs.map((item) {
-            return LocationModel(
-              id: item['id']?.toString() ?? '0',
-              name: item['name'] ?? 'Untitled',
-              latitude: (item['latitude'] as num?)?.toDouble() ?? 0.0,
-              longitude: (item['longitude'] as num?)?.toDouble() ?? 0.0,
-              description: item['description'] ?? '',
-              longDescription: item['longDescription'] ?? '',
-              images: item['images'] != null
-                  ? List<String>.from(item['images'])
-                  : [],
-              category: item['category'] ?? '',
-            );
-          }),
-        );
-      }
-
-      _locations = loadedLocs;
-      notifyListeners();
-    } catch (e) {
-      debugPrint("Error loading local locations JSON fallback: $e");
-    }
-
-    // 2. Cloud Data (Source of Truth): Listen to Supabase content additions.
+    // Listen to Supabase content (source of truth).
     // We only listen when a user is actually logged in.
     try {
       _supabase.auth.onAuthStateChange.listen((event) {
@@ -178,6 +129,8 @@ class LocationProvider extends ChangeNotifier {
                                 ? [row['imageUrl']]
                                 : []),
                       category: row['category'] ?? '',
+                      howTo: row['howTo'] ?? '',
+                      whatTo: row['whatTo'] ?? '',
                     );
                   }).toList();
 

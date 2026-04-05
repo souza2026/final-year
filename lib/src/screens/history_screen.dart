@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:latlong2/latlong.dart';
 import 'dart:io';
 import '../providers/location_provider.dart';
+import '../providers/map_state_provider.dart';
 import '../models/location_model.dart';
+import '../constants/categories.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -15,15 +18,63 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   String _searchQuery = '';
+  ValueNotifier<LocationModel?>? _selectedLocationNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _selectedLocationNotifier = context.read<ValueNotifier<LocationModel?>>();
+      _selectedLocationNotifier!.addListener(_onSelectedLocationChanged);
+      _checkForSelectedLocation();
+    });
+  }
+
+  void _onSelectedLocationChanged() {
+    _checkForSelectedLocation();
+  }
+
+  void _checkForSelectedLocation() {
+    final location = _selectedLocationNotifier?.value;
+    if (location != null) {
+      _selectedLocationNotifier!.value = null;
+      _showLocationDetail(context, location);
+    }
+  }
+
+  @override
+  void dispose() {
+    _selectedLocationNotifier?.removeListener(_onSelectedLocationChanged);
+    super.dispose();
+  }
 
   void _showLocationDetail(BuildContext context, LocationModel location) {
+    final locationProvider = context.read<LocationProvider>();
+    final currentLocation = locationProvider.currentLocation;
+
+    String distanceText = '';
+    if (currentLocation != null &&
+        currentLocation.latitude != null &&
+        currentLocation.longitude != null) {
+      const Distance distance = Distance();
+      final double meter = distance(
+        LatLng(currentLocation.latitude!, currentLocation.longitude!),
+        LatLng(location.latitude, location.longitude),
+      );
+      if (meter > 1000) {
+        distanceText = '${(meter / 1000).toStringAsFixed(1)} km away';
+      } else {
+        distanceText = '${meter.round()} m away';
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (sheetContext) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.7,
+          initialChildSize: 0.75,
           minChildSize: 0.4,
           maxChildSize: 0.95,
           builder: (_, controller) {
@@ -36,6 +87,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 controller: controller,
                 padding: const EdgeInsets.all(20),
                 children: [
+                  // Drag handle
                   Center(
                     child: Container(
                       width: 40,
@@ -47,6 +99,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                   ),
+                  // Title
                   Text(
                     location.name,
                     style: GoogleFonts.oswald(
@@ -55,6 +108,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       color: const Color(0xFF005A60),
                     ),
                   ),
+                  // Category badge
                   if (location.category.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Align(
@@ -62,14 +116,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 4,
+                          vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF005A60).withAlpha(25),
+                          color: const Color(0xFF005A60).withAlpha(20),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          location.category.replaceAll('_', ' ').toUpperCase(),
+                          LocationCategories.getLabel(location.category),
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -80,74 +134,111 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  if (location.images.isNotEmpty)
+                  // Images
+                  if (location.images.isNotEmpty) ...[
+                    const SizedBox(height: 16),
                     SizedBox(
                       height: 220,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: location.images.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: ClipRRect(
+                      child: location.images.length == 1
+                          ? ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: location.images[index].startsWith('http')
+                              child: location.images.first.startsWith('http')
                                   ? CachedNetworkImage(
-                                      imageUrl: location.images[index],
-                                      width: 300,
+                                      imageUrl: location.images.first,
+                                      width: double.infinity,
+                                      height: 220,
                                       fit: BoxFit.cover,
                                       placeholder: (context, url) => Container(
-                                        width: 300,
                                         color: Colors.grey[200],
                                         child: const Center(
-                                          child: CircularProgressIndicator(),
+                                          child: CircularProgressIndicator(strokeWidth: 2),
                                         ),
                                       ),
-                                      errorWidget: (context, url, error) =>
-                                          Container(
-                                        width: 300,
+                                      errorWidget: (context, url, error) => Container(
                                         color: Colors.grey[200],
-                                        child: const Icon(Icons.error,
-                                            color: Colors.red),
+                                        child: const Icon(Icons.error, color: Colors.red),
                                       ),
                                     )
                                   : Image.file(
-                                      File(location.images[index]),
-                                      width: 300,
+                                      File(location.images.first),
+                                      width: double.infinity,
+                                      height: 220,
                                       fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              Container(
-                                        width: 300,
+                                      errorBuilder: (context, error, stackTrace) => Container(
                                         color: Colors.grey[200],
-                                        child: const Icon(Icons.error,
-                                            color: Colors.red),
+                                        child: const Icon(Icons.error, color: Colors.red),
                                       ),
                                     ),
+                            )
+                          : ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: location.images.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 10),
+                              itemBuilder: (context, index) {
+                                final img = location.images[index];
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: img.startsWith('http')
+                                      ? CachedNetworkImage(
+                                          imageUrl: img,
+                                          width: 300,
+                                          height: 220,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) => Container(
+                                            width: 300,
+                                            color: Colors.grey[200],
+                                            child: const Center(
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            ),
+                                          ),
+                                          errorWidget: (context, url, error) => Container(
+                                            width: 300,
+                                            color: Colors.grey[200],
+                                            child: const Icon(Icons.error, color: Colors.red),
+                                          ),
+                                        )
+                                      : Image.file(
+                                          File(img),
+                                          width: 300,
+                                          height: 220,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => Container(
+                                            width: 300,
+                                            color: Colors.grey[200],
+                                            child: const Icon(Icons.error, color: Colors.red),
+                                          ),
+                                        ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
-                  const SizedBox(height: 16),
+                  ],
+                  // Description
+                  const SizedBox(height: 20),
                   Text(
-                    location.description,
-                    style: GoogleFonts.openSans(
-                      fontSize: 15,
-                      color: Colors.grey[800],
+                    'Description',
+                    style: GoogleFonts.oswald(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF005A60),
                     ),
                   ),
-                  if (location.longDescription.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      height: 1,
-                      color: Colors.grey[200],
+                  const SizedBox(height: 8),
+                  Text(
+                    location.longDescription.isNotEmpty
+                        ? location.longDescription
+                        : location.description,
+                    style: GoogleFonts.openSans(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                      height: 1.6,
                     ),
-                    const SizedBox(height: 16),
+                  ),
+                  // How to Get There
+                  if (location.howTo.isNotEmpty) ...[
+                    const SizedBox(height: 24),
                     Text(
-                      'History & Details',
+                      'How to Get There',
                       style: GoogleFonts.oswald(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -156,14 +247,128 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      location.longDescription,
+                      location.howTo,
                       style: GoogleFonts.openSans(
-                        fontSize: 15,
+                        fontSize: 14,
                         color: Colors.grey[700],
                         height: 1.6,
                       ),
                     ),
                   ],
+                  // What to Look For
+                  if (location.whatTo.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      'What to Look For',
+                      style: GoogleFonts.oswald(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF005A60),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      location.whatTo,
+                      style: GoogleFonts.openSans(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                  // Buttons
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            if (currentLocation != null &&
+                                currentLocation.latitude != null &&
+                                currentLocation.longitude != null) {
+                              final mapState = context.read<MapStateProvider>();
+                              final origin = LatLng(
+                                currentLocation.latitude!,
+                                currentLocation.longitude!,
+                              );
+                              final destination = LatLng(location.latitude, location.longitude);
+                              Navigator.pop(context);
+                              context.read<ValueNotifier<int>>().value = 0;
+                              mapState.selectDestination(origin, destination, location.name);
+                            }
+                          },
+                          icon: const Icon(Icons.directions, size: 18, color: Colors.white),
+                          label: Flexible(
+                            child: Text(
+                              distanceText.isNotEmpty
+                                  ? 'Directions ($distanceText)'
+                                  : 'Get Directions',
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF005A60),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Flexible(child: Builder(
+                        builder: (ctx) {
+                          final mapState = ctx.read<MapStateProvider>();
+                          final canAddStop = mapState.canAddStop;
+                          return ElevatedButton.icon(
+                            onPressed: canAddStop
+                                ? () {
+                                    if (currentLocation != null &&
+                                        currentLocation.latitude != null &&
+                                        currentLocation.longitude != null) {
+                                      final origin = LatLng(
+                                        currentLocation.latitude!,
+                                        currentLocation.longitude!,
+                                      );
+                                      final point = LatLng(location.latitude, location.longitude);
+                                      Navigator.pop(context);
+                                      context.read<ValueNotifier<int>>().value = 0;
+                                      mapState.addWaypoint(origin, point, location.name);
+                                    }
+                                  }
+                                : null,
+                            icon: Icon(
+                              Icons.add_location_alt,
+                              size: 18,
+                              color: canAddStop ? Colors.white : Colors.grey[400],
+                            ),
+                            label: Text(
+                              'Add Stop',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: canAddStop
+                                  ? Colors.red[400]
+                                  : Colors.grey[200],
+                              foregroundColor: canAddStop ? Colors.white : Colors.grey[400],
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                            ),
+                          );
+                        },
+                      )),
+                    ],
+                  ),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -340,6 +545,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       color: Colors.black,
                     ),
                   ),
+                  if (location.category.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF005A60).withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        LocationCategories.getLabel(location.category),
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF005A60),
+                        ),
+                      ),
+                    ),
+                  ],
                   if (location.description.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
