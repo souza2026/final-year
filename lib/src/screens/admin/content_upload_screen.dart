@@ -6,9 +6,8 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/image_upload_service.dart';
 import '../../providers/location_provider.dart';
 import '../../models/location_model.dart';
 import '../../constants/categories.dart';
@@ -54,32 +53,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
     });
   }
 
-  Future<String> _uploadImage(XFile image) async {
-    final String extension = p.extension(image.path).toLowerCase();
-    final String safeExtension = extension.isNotEmpty ? extension : '.jpg';
-    final String fileName =
-        '${DateTime.now().millisecondsSinceEpoch}$safeExtension';
-    final String path = 'uploads/$fileName';
-
-    final bytes = await image.readAsBytes();
-
-    try {
-      await Supabase.instance.client.storage
-          .from('site_images')
-          .uploadBinary(
-            path,
-            bytes,
-            fileOptions: const FileOptions(upsert: true),
-          );
-      final String publicUrl = Supabase.instance.client.storage
-          .from('site_images')
-          .getPublicUrl(path);
-      return publicUrl;
-    } catch (e) {
-      debugPrint("Storage error: $e");
-      rethrow;
-    }
-  }
+  Future<String> _uploadImage(XFile image) => ImageUploadService.uploadXFile(image);
 
   Future<void> _submit() async {
     if (_isLoading) return;

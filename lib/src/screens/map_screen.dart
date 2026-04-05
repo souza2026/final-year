@@ -3,8 +3,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:location/location.dart' as loc;
-import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:io';
 import '../providers/location_provider.dart';
 import '../providers/map_state_provider.dart';
 import '../models/location_model.dart';
@@ -13,8 +11,10 @@ import '../widgets/map/location_name_chip.dart';
 import '../widgets/map/radius_selector_widget.dart';
 import '../widgets/map/route_info_bar.dart'; // DirectionPanel
 import '../widgets/map/category_chips_widget.dart';
-import '../constants/categories.dart';
 import '../widgets/map/navigation_bar_widget.dart';
+import '../widgets/map/map_markers.dart';
+import '../widgets/map/map_controls.dart';
+import '../widgets/location_detail_sheet.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 
@@ -128,21 +128,12 @@ class _MapScreenState extends State<MapScreen> {
     LocationModel location,
     loc.LocationData? currentLocation,
   ) {
-    String distanceText = '';
-    if (currentLocation != null &&
-        currentLocation.latitude != null &&
-        currentLocation.longitude != null) {
-      const Distance distance = Distance();
-      final double meter = distance(
-        LatLng(currentLocation.latitude!, currentLocation.longitude!),
-        LatLng(location.latitude, location.longitude),
-      );
-      if (meter > 1000) {
-        distanceText = '${(meter / 1000).toStringAsFixed(1)} km away';
-      } else {
-        distanceText = '${meter.round()} m away';
-      }
-    }
+    final distanceText = computeDistanceText(
+      userLat: currentLocation?.latitude,
+      userLng: currentLocation?.longitude,
+      locationLat: location.latitude,
+      locationLng: location.longitude,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -179,94 +170,14 @@ class _MapScreenState extends State<MapScreen> {
               ),
               if (location.category.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF005A60).withAlpha(20),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    LocationCategories.getLabel(location.category),
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF005A60),
-                    ),
-                  ),
-                ),
+                LocationCategoryBadge(category: location.category),
               ],
               if (location.images.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                SizedBox(
+                LocationImageGallery(
+                  images: location.images,
                   height: 180,
-                  child: location.images.length == 1
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: location.images.first.startsWith('http')
-                              ? CachedNetworkImage(
-                                  imageUrl: location.images.first,
-                                  width: double.infinity,
-                                  height: 180,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => Container(
-                                    color: Colors.grey[200],
-                                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                  ),
-                                  errorWidget: (context, url, error) => Container(
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.error, color: Colors.red),
-                                  ),
-                                )
-                              : Image.file(
-                                  File(location.images.first),
-                                  width: double.infinity,
-                                  height: 180,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.error, color: Colors.red),
-                                  ),
-                                ),
-                        )
-                      : ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: location.images.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 10),
-                          itemBuilder: (context, index) {
-                            final img = location.images[index];
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: img.startsWith('http')
-                                  ? CachedNetworkImage(
-                                      imageUrl: img,
-                                      width: 240,
-                                      height: 180,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) => Container(
-                                        width: 240,
-                                        color: Colors.grey[200],
-                                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                      ),
-                                      errorWidget: (context, url, error) => Container(
-                                        width: 240,
-                                        color: Colors.grey[200],
-                                        child: const Icon(Icons.error, color: Colors.red),
-                                      ),
-                                    )
-                                  : Image.file(
-                                      File(img),
-                                      width: 240,
-                                      height: 180,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => Container(
-                                        width: 240,
-                                        color: Colors.grey[200],
-                                        child: const Icon(Icons.error, color: Colors.red),
-                                      ),
-                                    ),
-                            );
-                          },
-                        ),
+                  multiImageWidth: 240,
                 ),
               ],
               const SizedBox(height: 12),
@@ -308,97 +219,43 @@ class _MapScreenState extends State<MapScreen> {
                   final mapState = context.read<MapStateProvider>();
                   final canAddStop = mapState.canAddStop;
 
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            if (currentLocation != null &&
-                                currentLocation.latitude != null &&
-                                currentLocation.longitude != null) {
-                              final origin = LatLng(
-                                currentLocation.latitude!,
-                                currentLocation.longitude!,
-                              );
-                              final destination = LatLng(location.latitude, location.longitude);
-                              Navigator.pop(context);
-                              await mapState.selectDestination(origin, destination, location.name);
-                              _fitBoundsForRoute(origin, [destination]);
-                              setState(() {});
-                            }
-                          },
-                          icon: const Icon(Icons.directions, size: 18, color: Colors.white),
-                          label: Flexible(
-                            child: Text(
-                              distanceText.isNotEmpty
-                                  ? 'Directions ($distanceText)'
-                                  : 'Get Directions',
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF005A60),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: ElevatedButton.icon(
-                          onPressed: canAddStop
-                              ? () async {
-                                  if (currentLocation != null &&
-                                      currentLocation.latitude != null &&
-                                      currentLocation.longitude != null) {
-                                    final origin = LatLng(
-                                      currentLocation.latitude!,
-                                      currentLocation.longitude!,
-                                    );
-                                    final point = LatLng(location.latitude, location.longitude);
-                                    Navigator.pop(context);
-                                    await mapState.addWaypoint(origin, point, location.name);
-                                    final allPoints = [
-                                      ...mapState.waypoints.map((w) => w.latLng),
-                                      if (mapState.routeDestination != null) mapState.routeDestination!,
-                                    ];
-                                    _fitBoundsForRoute(origin, allPoints);
-                                    setState(() {});
-                                  }
-                                }
-                              : null,
-                          icon: Icon(
-                            Icons.add_location_alt,
-                            size: 18,
-                            color: canAddStop ? Colors.white : Colors.grey[400],
-                          ),
-                          label: Text(
-                            'Add Stop',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: canAddStop
-                                ? Colors.red[400]
-                                : Colors.grey[200],
-                            foregroundColor: canAddStop ? Colors.white : Colors.grey[400],
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  return LocationActionButtons(
+                    distanceText: distanceText,
+                    canAddStop: canAddStop,
+                    onGetDirections: () async {
+                      if (currentLocation != null &&
+                          currentLocation.latitude != null &&
+                          currentLocation.longitude != null) {
+                        final origin = LatLng(
+                          currentLocation.latitude!,
+                          currentLocation.longitude!,
+                        );
+                        final destination = LatLng(location.latitude, location.longitude);
+                        Navigator.pop(context);
+                        await mapState.selectDestination(origin, destination, location.name);
+                        _fitBoundsForRoute(origin, [destination]);
+                        setState(() {});
+                      }
+                    },
+                    onAddStop: () async {
+                      if (currentLocation != null &&
+                          currentLocation.latitude != null &&
+                          currentLocation.longitude != null) {
+                        final origin = LatLng(
+                          currentLocation.latitude!,
+                          currentLocation.longitude!,
+                        );
+                        final point = LatLng(location.latitude, location.longitude);
+                        Navigator.pop(context);
+                        await mapState.addWaypoint(origin, point, location.name);
+                        final allPoints = [
+                          ...mapState.waypoints.map((w) => w.latLng),
+                          if (mapState.routeDestination != null) mapState.routeDestination!,
+                        ];
+                        _fitBoundsForRoute(origin, allPoints);
+                        setState(() {});
+                      }
+                    },
                   );
                 },
               ),
@@ -437,122 +294,14 @@ class _MapScreenState extends State<MapScreen> {
           final center = mapState.routeDestination ?? initialPos;
           mapState.calculateNearbyCountSilent(filteredLocations, center);
 
-          // Build markers based on radius
-          const distanceCalc = Distance();
+          // Build markers
           final radiusMeters = mapState.selectedRadius * 1000;
-          List<Marker> markers = filteredLocations.map((loc) {
-            final locPoint = LatLng(loc.latitude, loc.longitude);
-            final metersFromCenter = distanceCalc(center, locPoint);
-            final isInsideRadius = metersFromCenter <= radiusMeters;
-
-            if (isInsideRadius) {
-              final iconAsset = LocationCategories.getIconAsset(loc.category);
-              return Marker(
-                point: locPoint,
-                width: 150,
-                height: 100,
-                child: GestureDetector(
-                  onTap: () =>
-                      _showLocationDetails(context, loc, currentLocation),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 45,
-                        height: 45,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF005A60),
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black26, blurRadius: 4),
-                          ],
-                        ),
-                        child: Center(
-                          child: iconAsset != null
-                              ? Image.asset(
-                                  iconAsset,
-                                  width: 24,
-                                  height: 24,
-                                  color: Colors.white,
-                                  colorBlendMode: BlendMode.srcIn,
-                                )
-                              : Icon(
-                                  LocationCategories.getIcon(loc.category),
-                                  size: 24,
-                                  color: Colors.white,
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black26, blurRadius: 2),
-                          ],
-                        ),
-                        child: Text(
-                          loc.name,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF005A60),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            } else {
-              final iconAsset = LocationCategories.getIconAsset(loc.category);
-              return Marker(
-                point: locPoint,
-                width: 40,
-                height: 40,
-                child: GestureDetector(
-                  onTap: () =>
-                      _showLocationDetails(context, loc, currentLocation),
-                  behavior: HitTestBehavior.opaque,
-                  child: Center(
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF005A60), width: 2),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black26, blurRadius: 2),
-                        ],
-                      ),
-                      child: Center(
-                        child: iconAsset != null
-                            ? Image.asset(
-                                iconAsset,
-                                width: 16,
-                                height: 16,
-                                color: const Color(0xFF005A60),
-                                colorBlendMode: BlendMode.srcIn,
-                              )
-                            : Icon(
-                                LocationCategories.getIcon(loc.category),
-                                size: 16,
-                                color: const Color(0xFF005A60),
-                              ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }
-          }).toList();
+          List<Marker> markers = buildLocationMarkers(
+            filteredLocations: filteredLocations,
+            center: center,
+            radiusMeters: radiusMeters,
+            onTap: (loc) => _showLocationDetails(context, loc, currentLocation),
+          );
 
           // Current location marker
           if (currentLocation != null &&
@@ -562,123 +311,21 @@ class _MapScreenState extends State<MapScreen> {
               currentLocation.latitude!,
               currentLocation.longitude!,
             );
-            if (mapState.hasActiveRoute) {
-              // Show "A" label when route is active
-              markers.add(
-                Marker(
-                  point: userPoint,
-                  width: 36,
-                  height: 36,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF005A60),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black26, blurRadius: 4),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'A',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            } else {
-              // Default blue dot when no route
-              markers.add(
-                Marker(
-                  point: userPoint,
-                  width: 30,
-                  height: 30,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 4,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
+            markers.add(buildUserLocationMarker(
+              userPoint: userPoint,
+              hasActiveRoute: mapState.hasActiveRoute,
+            ));
           }
 
           // Waypoint markers (B, C, D, ...)
-          for (int i = 0; i < mapState.waypoints.length; i++) {
-            final label = String.fromCharCode(66 + i); // B, C, D, ...
-            markers.add(
-              Marker(
-                point: mapState.waypoints[i].latLng,
-                width: 36,
-                height: 36,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF005A60),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black26, blurRadius: 4),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
+          markers.addAll(buildWaypointMarkers(mapState.waypoints));
 
-          // Destination marker (last letter)
+          // Destination marker
           if (mapState.routeDestination != null) {
-            final destLabel = String.fromCharCode(66 + mapState.waypoints.length); // next after waypoints
-            markers.add(
-              Marker(
-                point: mapState.routeDestination!,
-                width: 36,
-                height: 36,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF005A60),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black26, blurRadius: 4),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      destLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
+            markers.add(buildDestinationMarker(
+              destination: mapState.routeDestination!,
+              waypointCount: mapState.waypoints.length,
+            ));
           }
 
           return Stack(
@@ -787,77 +434,40 @@ class _MapScreenState extends State<MapScreen> {
               Positioned(
                 bottom: 120,
                 right: 20,
-                child: Consumer<MapStateProvider>(
-                  builder: (context, ms, _) {
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (!ms.isDirectionPanelOpen && !ms.hasActiveRoute) ...[
-                          FloatingActionButton(
-                            heroTag: 'directions',
-                            backgroundColor: const Color(0xFF005A60),
-                            mini: true,
-                            onPressed: () => ms.setDirectionPanelOpen(true),
-                            child: const Icon(Icons.directions, color: Colors.white),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        FloatingActionButton(
-                          heroTag: 'zoom_in',
-                          backgroundColor: Colors.white,
-                          mini: true,
-                          child: const Icon(Icons.add, color: Color(0xFF005A60)),
-                          onPressed: () {
-                            _mapController.move(
-                              _mapController.camera.center,
-                              _mapController.camera.zoom + 1,
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        FloatingActionButton(
-                          heroTag: 'zoom_out',
-                          backgroundColor: Colors.white,
-                          mini: true,
-                          child: const Icon(Icons.remove, color: Color(0xFF005A60)),
-                          onPressed: () {
-                            _mapController.move(
-                              _mapController.camera.center,
-                              _mapController.camera.zoom - 1,
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        FloatingActionButton(
-                          heroTag: 'my_location',
-                          backgroundColor: Colors.white,
-                          child: const Icon(
-                            Icons.my_location,
-                            color: Color(0xFF005A60),
-                          ),
-                          onPressed: () async {
-                            await locationProvider.refreshLocation();
-                            final currLoc = locationProvider.currentLocation;
-                            if (currLoc != null) {
-                              _mapController.move(
-                                LatLng(
-                                  currLoc.latitude ?? 0.0,
-                                  currLoc.longitude ?? 0.0,
-                                ),
-                                15.0,
-                              );
-                              if (currLoc.latitude != null &&
-                                  currLoc.longitude != null) {
-                                mapState.updateCurrentLocationName(
-                                  currLoc.latitude!,
-                                  currLoc.longitude!,
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      ],
+                child: MapControls(
+                  showDirectionButton: !mapState.isDirectionPanelOpen && !mapState.hasActiveRoute,
+                  onOpenDirections: () => mapState.setDirectionPanelOpen(true),
+                  onZoomIn: () {
+                    _mapController.move(
+                      _mapController.camera.center,
+                      _mapController.camera.zoom + 1,
                     );
+                  },
+                  onZoomOut: () {
+                    _mapController.move(
+                      _mapController.camera.center,
+                      _mapController.camera.zoom - 1,
+                    );
+                  },
+                  onMyLocation: () async {
+                    await locationProvider.refreshLocation();
+                    final currLoc = locationProvider.currentLocation;
+                    if (currLoc != null) {
+                      _mapController.move(
+                        LatLng(
+                          currLoc.latitude ?? 0.0,
+                          currLoc.longitude ?? 0.0,
+                        ),
+                        15.0,
+                      );
+                      if (currLoc.latitude != null &&
+                          currLoc.longitude != null) {
+                        mapState.updateCurrentLocationName(
+                          currLoc.latitude!,
+                          currLoc.longitude!,
+                        );
+                      }
+                    }
                   },
                 ),
               ),

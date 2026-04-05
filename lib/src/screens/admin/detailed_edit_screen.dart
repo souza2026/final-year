@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../constants/categories.dart';
+import '../../services/image_upload_service.dart';
 
 class DetailedEditScreen extends StatefulWidget {
   final String docId;
@@ -98,25 +99,7 @@ class DetailedEditScreenState extends State<DetailedEditScreen> {
     });
   }
 
-  Future<String?> _uploadImage(File image) async {
-    try {
-      final bytes = await image.readAsBytes();
-      final path = 'site_images/${DateTime.now().toIso8601String()}.jpg';
-      await Supabase.instance.client.storage
-          .from('site_images')
-          .uploadBinary(
-            path,
-            bytes,
-            fileOptions: const FileOptions(upsert: true),
-          );
-      return Supabase.instance.client.storage
-          .from('site_images')
-          .getPublicUrl(path);
-    } catch (e) {
-      debugPrint("Storage error: $e");
-      return null;
-    }
-  }
+  Future<String?> _uploadImage(File image) => ImageUploadService.uploadFile(image);
 
   Future<void> _updateContent() async {
     if (!_formKey.currentState!.validate()) return;

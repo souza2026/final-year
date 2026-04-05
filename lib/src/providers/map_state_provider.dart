@@ -37,6 +37,7 @@ class MapStateProvider extends ChangeNotifier {
 
   // Route + Waypoints
   List<LatLng> _routePolyline = [];
+  List<LatLng> _fullRoutePolyline = [];
   Waypoint? _destination;
   List<Waypoint> _waypoints = []; // intermediate stops
   double _routeDistanceKm = 0;
@@ -184,12 +185,14 @@ class MapStateProvider extends ChangeNotifier {
 
     final result = await _routingService.getRoute(points);
     if (result != null) {
-      _routePolyline = result.polylinePoints;
+      _fullRoutePolyline = result.polylinePoints;
+      _routePolyline = List.from(_fullRoutePolyline);
       _routeDistanceKm = result.distanceKm;
       _routeDurationMin = result.durationMinutes;
       _routeSteps = result.steps;
     } else {
       // Fallback: straight line through all points
+      _fullRoutePolyline = List.from(points);
       _routePolyline = points;
       const distance = Distance();
       double totalDist = 0;
@@ -221,6 +224,7 @@ class MapStateProvider extends ChangeNotifier {
   /// Clear the active route.
   void clearRoute() {
     _routePolyline = [];
+    _fullRoutePolyline = [];
     _destination = null;
     _waypoints = [];
     _routeDistanceKm = 0;
@@ -313,8 +317,11 @@ class MapStateProvider extends ChangeNotifier {
   void stopNavigation() {
     _isNavigating = false;
     _currentStepIndex = 0;
+    _routePolyline = List.from(_fullRoutePolyline);
     notifyListeners();
   }
+
+  bool _isRerouting = false;
 
   void updateNavigationPosition(LatLng position) {
     if (!_isNavigating || _routeSteps.isEmpty) return;
@@ -344,6 +351,52 @@ class MapStateProvider extends ChangeNotifier {
       }
     }
 
+    // Find closest point on route and check if off-path
+    if (_fullRoutePolyline.length >= 2) {
+      int closestIndex = 0;
+      double closestDist = double.infinity;
+      for (int i = 0; i < _fullRoutePolyline.length; i++) {
+        final d = distance(position, _fullRoutePolyline[i]);
+        if (d < closestDist) {
+          closestDist = d;
+          closestIndex = i;
+        }
+      }
+
+      // Off-route: recalculate from current position
+      if (closestDist > 50 && !_isRerouting && _destination != null) {
+        _reroute(position);
+        return;
+      }
+
+      // Trim polyline to show only remaining route
+      _routePolyline = [position, ..._fullRoutePolyline.sublist(closestIndex)];
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> _reroute(LatLng currentPosition) async {
+    if (_destination == null) return;
+    _isRerouting = true;
+
+    final points = [
+      currentPosition,
+      ..._waypoints.map((w) => w.latLng),
+      _destination!.latLng,
+    ];
+
+    final result = await _routingService.getRoute(points);
+    if (result != null && _isNavigating) {
+      _fullRoutePolyline = result.polylinePoints;
+      _routePolyline = List.from(_fullRoutePolyline);
+      _routeDistanceKm = result.distanceKm;
+      _routeDurationMin = result.durationMinutes;
+      _routeSteps = result.steps;
+      _currentStepIndex = 0;
+    }
+
+    _isRerouting = false;
     notifyListeners();
   }
 
