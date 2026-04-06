@@ -19,10 +19,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:goa_maps/src/screens/map_screen.dart';
-import 'package:goa_maps/src/screens/history_screen.dart';
-import 'package:goa_maps/src/screens/ai_screen.dart';
-import 'package:goa_maps/src/screens/profile_screen.dart';
+import 'package:echoes_in_stone/src/screens/map_screen.dart';
+import 'package:echoes_in_stone/src/screens/history_screen.dart';
+import 'package:echoes_in_stone/src/screens/ai_screen.dart';
+import 'package:echoes_in_stone/src/screens/profile_screen.dart';
 
 /// [MainScreen] is the root scaffold that hosts the four app tabs.
 /// It is a StatefulWidget because it tracks which tab is currently

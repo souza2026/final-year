@@ -21,9 +21,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:goa_maps/src/services/auth_service.dart';
-import 'package:goa_maps/src/services/image_upload_service.dart';
-import 'package:goa_maps/src/theme/theme.dart';
+import 'package:echoes_in_stone/src/services/auth_service.dart';
+import 'package:echoes_in_stone/src/services/image_upload_service.dart';
+import 'package:echoes_in_stone/src/theme/theme.dart';
 import 'dart:developer' as developer;
 
 /// [EditProfileScreen] is a StatefulWidget because it manages form

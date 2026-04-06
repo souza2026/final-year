@@ -29,10 +29,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:goa_maps/src/screens/admin/detailed_edit_screen.dart';
-import 'package:goa_maps/src/screens/edit_profile_screen.dart';
-import 'package:goa_maps/src/screens/main_screen.dart';
-import 'package:goa_maps/src/screens/onboarding_screen.dart';
+import 'package:echoes_in_stone/src/screens/admin/detailed_edit_screen.dart';
+import 'package:echoes_in_stone/src/screens/edit_profile_screen.dart';
+import 'package:echoes_in_stone/src/screens/main_screen.dart';
+import 'package:echoes_in_stone/src/screens/onboarding_screen.dart';
 import '../services/auth_service.dart';
 import '../screens/admin_home_screen.dart';
 import '../screens/admin/content_upload_screen.dart';

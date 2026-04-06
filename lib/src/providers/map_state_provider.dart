@@ -20,7 +20,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/location_model.dart';
 import '../models/waypoint_model.dart';
 import '../services/geocoding_service.dart';
-import 'package:goa_maps/src/models/route_step_model.dart';
+import 'package:echoes_in_stone/src/models/route_step_model.dart';
 import '../services/routing_service.dart';
 
 /// Represents a single search result, which can originate from either

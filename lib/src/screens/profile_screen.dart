@@ -21,10 +21,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:goa_maps/src/models/user_model.dart';
-import 'package:goa_maps/src/screens/edit_profile_screen.dart';
-import 'package:goa_maps/src/services/auth_service.dart';
-import 'package:goa_maps/src/theme/theme.dart';
+import 'package:echoes_in_stone/src/models/user_model.dart';
+import 'package:echoes_in_stone/src/screens/edit_profile_screen.dart';
+import 'package:echoes_in_stone/src/services/auth_service.dart';
+import 'package:echoes_in_stone/src/theme/theme.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
